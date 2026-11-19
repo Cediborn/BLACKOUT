@@ -12,7 +12,8 @@ LG.Player = function (def, team, idx) {
   this.idx = idx;
   this.stats = def.stats;
 
-  this.maxSpeed = 4.2 + this.stats.speed * 0.32;
+  this.maxSpeed = (4.2 + this.stats.speed * 0.32) *
+    ((LG.Config.player && LG.Config.player.speedScale) || 1);   // Phase 11: TURBO twist
   this.accel = LG.Config.physics.playerAccel || 46;   // smooth, not twitchy
   this.sprintMul = LG.Config.physics.sprintMul || 1.55;
 

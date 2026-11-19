@@ -586,8 +586,8 @@ button:focus-visible,
   background-repeat: no-repeat, no-repeat;
 }
 .mode-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 12px;
   margin-top: clamp(14px, 3vmin, 24px);
   max-width: 520px;
@@ -2196,4 +2196,16 @@ body.reduced-motion #now-playing { transition: none; }
   :root { --btn-size: clamp(60px, 10vmin, 80px); }
   #joystick-zone { width: 32vmin; height: 32vmin; max-width: 200px; max-height: 200px; }
   .big-btn { min-width: 260px; padding: 18px 44px; }
+}
+
+/* Phase 11: five modes — two columns on wide screens so the list (and the
+   CONTINUE button under it) fits a landscape phone without scrolling */
+@media (min-aspect-ratio: 4/3) and (min-width: 700px) {
+  .mode-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 900px; gap: 10px; }
+  .mode-card { padding: 10px 14px; }
+}
+@media (max-height: 520px) {
+  .mode-list { gap: 8px; margin-top: 10px; }
+  .mode-card { padding: 8px 12px; }
+  .mode-card .mode-blurb { font-size: 12px; }
 }

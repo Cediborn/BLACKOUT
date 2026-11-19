@@ -1980,7 +1980,7 @@ section('17. game modes + tournament (pure, once-only, no RNG)');
 (function () {
   var M = LG.Modes;
   var T = LG.Tournament;
-  assert(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 3), 'three modes registered');
+  assert(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 5), 'five modes registered');
   assert(M.is('quick_match'), 'default mode is quick_match', M.id());
   assert(M.select('tournament') === 'tournament' && M.is('tournament'), 'select switches mode');
   assert(M.select('nope') === 'tournament', 'unknown mode ids are refused', M.id());
@@ -2290,6 +2290,64 @@ section('22. tackle lunge — tackleAnim is set, decays, and changes nothing els
   assert(me.tackleAnim === 0, 'the lunge is over in under half a second', me.tackleAnim);
   me.update(0);
   assert(me.tackleAnim === 0, 'a frozen frame never restarts the lunge');
+})();
+
+// ============================================================
+// PHASE 11 — FIRST TO 5 + STREET TWIST (mode rules)
+section('23. first to 5 — the fifth goal ends it; the cap + golden goal back it up');
+(function () {
+  var r = LG.Modes.rules('first_to_5');
+  assert(r.firstTo === 5 && r.duration === 300 && r.goldenGoal === true, 'first_to_5 rules: target 5, 5:00 cap, golden goal', JSON.stringify(r));
+  var m = new LG.MatchManager({ playerId: 'blaze', homeName: 'YOU', awayName: 'ROGUE', firstTo: 5, duration: 300, goldenGoal: true });
+  var t = { t: 0 }, i;
+  m.start();
+  assert(m.clock === 300, 'the match opens on its own 5:00 cap', m.clock);
+  for (i = 0; i < 300 && m.state !== 'PLAY'; i++) step(m, 1 / 60, t);
+  m.score = [4, 3];
+  var half = LG.Config.court.length / 2;
+  m.all.forEach(function (p) { p.hasBall = false; });
+  m.ball.owner = null; m.ball.reset(0, -half - 0.3); m.ball.lastKicker = m.home[0];
+  step(m, 1 / 60, t);
+  assert(m.state === 'GOAL' && m.score[0] === 5 && m._decided, 'the fifth goal decides the match', m.state + ' ' + m.score.join('-'));
+  var sawKick = false;
+  for (i = 0; i < 700 && m.state !== 'END'; i++) { step(m, 1 / 60, t); if (m.state === 'KICKOFF') sawKick = true; }
+  assert(m.state === 'END' && !sawKick, 'it ends after the celebration, no restart', m.state);
+  // below the target the match restarts normally
+  var m2 = new LG.MatchManager({ playerId: 'blaze', homeName: 'YOU', awayName: 'ROGUE', firstTo: 5, duration: 300 });
+  var t2 = { t: 0 };
+  m2.start(); for (i = 0; i < 300 && m2.state !== 'PLAY'; i++) step(m2, 1 / 60, t2);
+  m2.all.forEach(function (p) { p.hasBall = false; });
+  m2.ball.owner = null; m2.ball.reset(0, -half - 0.3); m2.ball.lastKicker = m2.home[0];
+  step(m2, 1 / 60, t2);
+  for (i = 0; i < 700 && m2.state === 'GOAL'; i++) step(m2, 1 / 60, t2);
+  assert(m2.state === 'KICKOFF' && !m2._finalized, 'a goal below the target restarts play', m2.state);
+})();
+
+section('24. street twist — bends Config for one match, always restores it');
+(function () {
+  var P = LG.Config.physics, C = LG.Config.court;
+  var g0 = P.gravity, d0 = P.groundDrag, r0 = C.ballRadius;
+  assert(LG.Modes.rules('street_twist').twist === 'daily', 'street_twist uses the daily twist');
+  var ids = Object.keys(LG.Modes.TWISTS);
+  assert(ids.length === 4, 'four twists registered', ids.join(','));
+  var days = {};
+  for (var d = 0; d < 8; d++) days[LG.Modes.twistOfDay(new Date(Date.UTC(2026, 10, 1 + d)))] = 1;
+  assert(Object.keys(days).length === 4, 'the daily twist rotates through all four', Object.keys(days).join(','));
+  assert(LG.Modes.applyTwist('moon') === 'moon' && P.gravity === -7, 'moon ball lowers gravity', P.gravity);
+  assert(LG.Modes.applyTwist('bigball') === 'bigball' && P.gravity === g0 && C.ballRadius === 0.5, 'switching twists restores the previous one first', P.gravity + ' / ' + C.ballRadius);
+  var big = newMatch('blaze');
+  assert(Math.abs(big.ball.r - 0.5) < 1e-9, 'big ball really builds a bigger ball', big.ball.r);
+  LG.Modes.applyTwist('turbo');
+  var fast = newMatch('blaze'), base = 4.2 + LG.byId('blaze').stats.speed * 0.32;
+  assert(Math.abs(fast.home[0].maxSpeed - base * 1.28) < 1e-9, 'turbo makes everyone faster', fast.home[0].maxSpeed);
+  LG.Modes.applyTwist('soap');
+  assert(P.groundDrag > d0, 'soap floor makes the court slippery', P.groundDrag);
+  LG.Modes.clearTwist();
+  assert(P.gravity === g0 && P.groundDrag === d0 && C.ballRadius === r0 && !LG.Config.player.speedScale && LG.Modes.activeTwist() === null,
+    'clearTwist restores every value exactly', [P.gravity, P.groundDrag, C.ballRadius, LG.Config.player.speedScale].join(','));
+  var normal = newMatch('blaze');
+  assert(Math.abs(normal.home[0].maxSpeed - base) < 1e-9 && Math.abs(normal.ball.r - r0) < 1e-9, 'a normal match after a twist is untouched');
+  assert(LG.Modes.applyTwist(null) === null && LG.Modes.applyTwist('nope') === null, 'no twist or an unknown twist applies nothing');
 })();
 
 // ============================================================

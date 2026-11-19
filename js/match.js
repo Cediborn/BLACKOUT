@@ -371,8 +371,9 @@ LG.MatchManager.prototype = {
   start: function () {
     this.state = 'KICKOFF';
     this.stateT = LG.Config.match.kickoffDelay;
-    this.clock = LG.Config.match.duration;
+    this.clock = this.opts.duration > 0 ? this.opts.duration : LG.Config.match.duration;
     this.score = [0, 0];
+    this._decided = false;     // FIRST TO N reached
     this.goldenGoal = false;
     this.goldenT = 0;
     this.placeKickoff();
@@ -478,8 +479,9 @@ LG.MatchManager.prototype = {
         if (LG.Celebration) LG.Celebration.update(this, dt);
         if (this.stateT <= 0) {
           if (LG.Celebration) { LG.Celebration.stop(); LG.Celebration.clearPoses(this); }
-          // Golden Goal: the goal that broke the tie is the winner — no restart
-          if (this.goldenGoal) { this.endMatch(); return; }
+          // Golden Goal: the goal that broke the tie is the winner — no restart.
+          // FIRST TO N: the target goal ends it the same way.
+          if (this.goldenGoal || this._decided) { this.endMatch(); return; }
           this.state = 'KICKOFF';
           this.stateT = LG.Config.match.kickoffDelay;
           this.placeKickoff();
@@ -1588,6 +1590,7 @@ LG.MatchManager.prototype = {
 
     if (teamGot === 0) this.score[0]++;
     else this.score[1]++;
+    if (this.opts.firstTo > 0 && this.score[teamGot] >= this.opts.firstTo) this._decided = true;
     this.statSide(teamGot).goals++;
     // a dribbler over the line keeps hasBall through the celebration and would
     // yank the ball off the kickoff spot — drop possession the moment it counts
@@ -1652,6 +1655,8 @@ LG.MatchManager.prototype = {
       stats: snap,
       mode: (LG.Modes && typeof LG.Modes.id === 'function') ? LG.Modes.id() : 'quick_match',
       goldenGoal: !!this.goldenGoal,
+      firstTo: this.opts.firstTo > 0 ? this.opts.firstTo : 0,
+      twist: this.opts.twist || null,
     };
     if (LG.Progression && LG.Progression.finalizeMatch) {
       result = LG.Progression.finalizeMatch(result) || result;

@@ -26,6 +26,17 @@ node tools/shot.js --state menu --out menu.png
 node tools/shot.js --glbtest --glbpose tackle:0.29 --out tackle.png
 ```
 
+## What's new in 1.2.0
+
+- **Realistic players:** a real-proportion human body with real animation clips (CC0, Quaternius Universal Animation Library), replacing the boxy figures. Each player is dressed in their kit on the body itself (shirt, collar and cuffs, shorts, socks, boots, skin, hair, keeper gloves, shirt number). Movement: idle, walk, jog, sprint, back-pedal, strafes, leaning into turns.
+- **Real football actions:** authored kicks, slide tackles, getting hit, and keeper dives on saves.
+- **Celebrations:** the scorer celebrates, dances, backflips or power-slides; teammates join in; the conceding side cries, shakes heads or folds arms; full-time reactions too.
+- **Living crowd:** fans watch the ball and each one claps, points, waves, chats or stands hands-on-hips. They go "ooh" with hands on heads after a near miss, applaud saves, the conceding end slumps, and fans near the ball lean in.
+- **Real traffic:** car-shaped sedans, hatchbacks, vans and taxis with spinning, steering wheels. They drive a one-way ring, slow for corners, keep their distance and brake with brake lights. Headlights glow at night.
+- **Sharper city:** detailed building facades (brick, framed windows, blinds, AC units) whose lit windows glow at night.
+- **New modes:** First to 5, and Street Twist (a daily rule twist: Moon Ball, Soap Floor, Big Ball or Turbo).
+- Compare against the old bodies with `index.html?athlete=0`. `node tools/look.js <script>` films the real game from scripted camera angles.
+
 ## What's new in 1.1.0
 
 - **Golden Goal:** a tied Street Cup match plays on at 0:00, and the next goal wins (capped at 90 s).

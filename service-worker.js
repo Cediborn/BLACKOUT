@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v18';   // Phase 11 — realistic athletes, real clips
+var CACHE_NAME = 'blackout-v19';   // Phase 11 — athletes, crowd, traffic, city, new modes
 var ASSETS = [
   './',
   './index.html',

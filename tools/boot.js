@@ -373,8 +373,8 @@ try {
   elements['btn-play'].fire('click');
   flow = 'mode';
   check(vis('mode-overlay') && !vis('menu-overlay'), 'KICK OFF opens GAME MODE', 'mode=' + vis('mode-overlay') + ' menu=' + vis('menu-overlay'));
-  check(!!LG.Modes && typeof LG.Modes.select === 'function' && LG.Modes.list().length === 3,
-    'LG.Modes exposes 3 modes', LG.Modes && LG.Modes.list().map(function (m) { return m.id; }).join(','));
+  check(!!LG.Modes && typeof LG.Modes.select === 'function' && LG.Modes.list().length === 5,
+    'LG.Modes exposes 5 modes', LG.Modes && LG.Modes.list().map(function (m) { return m.id; }).join(','));
   // BACK from mode returns to menu
   elements['btn-mode-back'].fire('click');
   check(vis('menu-overlay') && !vis('mode-overlay'), 'MODE BACK returns to the main menu');
@@ -1429,16 +1429,16 @@ section('9. game modes + tournament (Phase 3D: once-only fixtures, mode-aware re
   var M = LG.Modes;
   var T = LG.Tournament;
 
-  check(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 3), 'three mode definitions', M && M.DEFS.length);
+  check(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 5), 'five mode definitions', M && M.DEFS.length);
   check(!!(T && typeof T.start === 'function' && typeof T.endMatch === 'function'), 'LG.Tournament exposes the cup API');
-  check(M.is('quick_match') || M.is('challenge_match') || M.is('tournament'), 'mode id is always one of the three', M.id());
+  check(['quick_match', 'challenge_match', 'tournament', 'first_to_5', 'street_twist'].indexOf(M.id()) >= 0, 'mode id is always a registered mode', M.id());
 
   // --- mode select screen ---
   LG.eventBus.emit('quitRequested');
   elements['btn-play'].fire('click');
   check(vis('mode-overlay') && window.LGMain.getState() === 'mode', 'mode screen opens', window.LGMain.getState());
   var modeCards = (elements['mode-list'] && elements['mode-list'].children) || [];
-  check(modeCards.length === 3, 'mode list renders 3 cards', modeCards.length);
+  check(modeCards.length === 5, 'mode list renders 5 cards', modeCards.length);
   // pick CHALLENGE MATCH card -> CONTINUE -> challenge pick
   modeCards[1].fire('click');
   check(M.is('challenge_match'), 'clicking card 1 selects challenge_match', M.id());

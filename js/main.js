@@ -1368,8 +1368,11 @@
         var card = document.createElement('div');
         card.className = 'mode-card' + (m.id === selectedMode ? ' selected' : '');
         card.dataset.id = m.id;
+        var tw = m.id === 'street_twist' && LG.Modes.twistInfo ? LG.Modes.twistInfo('daily') : null;
         var tag = m.id === 'tournament' ? 'KNOCKOUT · 4 TEAMS'
           : m.id === 'challenge_match' ? 'USES YOUR 3 ACTIVE CHALLENGES'
+          : m.id === 'first_to_5' ? 'NO CLOCK PRESSURE · NO DRAWS'
+          : tw ? 'TODAY: ' + tw.label + ' — ' + tw.blurb.toUpperCase()
           : 'STANDARD MATCH';
         card.innerHTML =
           '<div class="mode-name">' + m.name + '</div>' +
@@ -1596,9 +1599,13 @@
     } else {
       matchOpts.mode = (LG.Modes && LG.Modes.id) ? LG.Modes.id() : 'quick_match';
     }
-    // the mode's rules ride into the match (Phase 10: Golden Goal)
+    // the mode's rules ride into the match (Phase 10 / 11)
     var rules = (LG.Modes && LG.Modes.rules) ? LG.Modes.rules() : {};
     matchOpts.goldenGoal = !!rules.goldenGoal;
+    matchOpts.firstTo = rules.firstTo > 0 ? rules.firstTo : 0;
+    matchOpts.duration = rules.duration > 0 ? rules.duration : 0;
+    // twists bend Config for THIS match only: always cleared first
+    matchOpts.twist = (LG.Modes && LG.Modes.applyTwist) ? LG.Modes.applyTwist(rules.twist) : null;
 
     // phone screens get one extra size bump, baked into every player as it is
     // built (model + collision body + height move together) — see LG.Config.player
@@ -1625,6 +1632,11 @@
     LG.Particles.clear();
     match.start();
     UIState = 'match';
+    // announce the bent rule (Phase 11)
+    try {
+      if (matchOpts.twist && LG.Modes.twistInfo) { var ti = LG.Modes.twistInfo(matchOpts.twist); LG.HUD.toast(ti.label + ' — ' + ti.blurb.toUpperCase(), 2600); }
+      else if (matchOpts.firstTo) LG.HUD.toast('FIRST TO ' + matchOpts.firstTo + ' WINS', 2400);
+    } catch (e) { /* cosmetic */ }
     syncMusic();   // stop now, not on the next frame — the whistle and the menu
     lastNow = nowSec();
     console.log('[START] match setup ' + (nowMs() - t0).toFixed(1) + 'ms (rosters ' +
@@ -1655,6 +1667,7 @@
   }
 
   function showMenu(on) {
+    if (on && LG.Modes && LG.Modes.clearTwist) LG.Modes.clearTwist();   // twists never outlive their match
     showOverlay('menu-overlay', on);
     document.getElementById('coin-chip').classList.toggle('hidden', false);
     document.getElementById('controls').classList.add('hidden');
@@ -1663,7 +1676,10 @@
   }
 
   function showOverlay(id, on) {
-    if (id === 'menu-overlay' && on) refreshQuickPlayLabel();
+    if (id === 'menu-overlay' && on) {
+      if (LG.Modes && LG.Modes.clearTwist) LG.Modes.clearTwist();       // twists never outlive their match
+      refreshQuickPlayLabel();
+    }
     var el = document.getElementById(id);
     if (!el) return;
     if (on) {
