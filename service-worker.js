@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v17';   // Phase 10 — golden goal, PLAY NOW, graphics quality, tackle clip
+var CACHE_NAME = 'blackout-v18';   // Phase 11 — realistic athletes, real clips
 var ASSETS = [
   './',
   './index.html',
@@ -53,6 +53,7 @@ var ASSETS = [
   './js/cosmetics.js',
   './js/rig.js',
   './js/realplayer.js',
+  './js/athlete.js',
   './js/ball.js',
   './js/player.js',
   './js/arena.js',
@@ -72,6 +73,7 @@ var ASSETS = [
   './lib/three.min.js',
   './lib/GLTFLoader.js',
   './3d/soap_soccer_player.glb',
+  './3d/athlete.glb',
   './icons/icon-192.svg',
   './icons/icon-512.svg'
 ];

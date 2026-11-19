@@ -1,13 +1,14 @@
 {
   "name": "blackout",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "BLACKOUT — 3v3 street football with goalkeepers (static browser game, no build step)",
+  "description": "BLACKOUT \u2014 3v3 street football with goalkeepers (static browser game, no build step)",
   "scripts": {
     "test": "npm run test:sim && npm run test:boot && npm run test:probes",
     "test:sim": "node tools/sim.js",
     "test:boot": "node tools/boot.js",
-    "test:probes": "node tools/cinprobe.js && node tools/celebprobe.js && node tools/feelprobe.js && node tools/reactprobe.js",
-    "serve": "python3 -m http.server 8080"
+    "test:probes": "node tools/cinprobe.js && node tools/celebprobe.js && node tools/feelprobe.js && node tools/reactprobe.js && node tools/athleteprobe.js",
+    "serve": "python3 -m http.server 8080",
+    "look": "node tools/look.js"
   }
 }

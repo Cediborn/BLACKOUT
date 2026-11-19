@@ -155,10 +155,42 @@ LG.Reactions = (function () {
 
   // ---- starting a reaction --------------------------------------
 
+  // Phase 11: clip-driven bodies play a real clip per reaction kind.
+  function clipFor(p, kind, opts) {
+    var d = (opts && opts.data) || {};
+    var h = hash((p.idx || 0) * 7 + (p.team || 0) * 3 + 1);
+    switch (kind) {
+      case 'fatigue': return { n: 'tired', dur: 1.6 };
+      case 'miss': return { n: 'no', dur: 1.2 };
+      case 'hit': return { n: h < 0.5 ? 'hit_stomach' : 'hit_chest', dur: 0.6 };
+      case 'save': {
+        var m = LG.Match, ball = m && m.ball;
+        if (!ball) return { n: 'hit_chest', dur: 0.5 };
+        var lx = Math.cos(p.facing || 0), lz = -Math.sin(p.facing || 0);   // the keeper's left
+        var lat = (ball.x - p.x) * lx + (ball.z - p.z) * lz;
+        if (Math.abs(lat) < 0.55) return { n: 'hit_chest', dur: 0.5 };
+        return { n: lat > 0 ? 'dodge_l' : 'dodge_r', dur: 1.0, ts: 1.35 };
+      }
+      case 'matchEnd':
+        if (d.side === 'win') return { n: d.gk ? 'yes' : (h < 0.34 ? 'celebrate' : (h < 0.67 ? 'dance' : 'yes')), dur: 6, hold: true };
+        if (d.side === 'lose') return { n: d.gk ? 'fold_arms' : (h < 0.5 ? 'crying' : 'tired'), dur: 6, hold: true };
+        return { n: h < 0.5 ? 'idle_look' : 'fold_arms', dur: 4, hold: true };
+      default: return null;     // possession / tackle: locomotion + the slide clip cover it
+    }
+  }
+
   function start(p, kind, opts) {
     try {
       var K = KINDS[kind];
       if (!K || !p || !p.model) return false;
+      if (p.model.clipDriven) {
+        var an = p.model.anim, c = clipFor(p, kind, opts);
+        if (!an || !an.emote || !c) return false;
+        if (!p._rxcd) p._rxcd = {};
+        if (_now < (p._rxcd[kind] || 0)) return false;
+        p._rxcd[kind] = _now + K.cd;
+        return an.emote(c.n, { dur: c.dur, hold: !!c.hold, ts: c.ts || 1, restart: kind === 'hit' || kind === 'save' });
+      }
       if (p.kickAnim > 0) return false;              // the kick owns the body
       if (clipOwns(p)) return false;                 // so does the authored tackle
       opts = opts || null;

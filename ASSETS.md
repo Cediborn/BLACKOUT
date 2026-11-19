@@ -6,7 +6,23 @@ abilities: nothing here grants gameplay stats.
 | Asset | Path | Used by | Licence | Author / Source |
 | --- | --- | --- | --- | --- |
 | Soccer player rig | `3d/soap_soccer_player.glb` | `js/realplayer.js`, `js/models.js` | CC-BY-4.0 | luccacatalan (Sketchfab) |
+| Athlete body + 37 clips | `3d/athlete.glb` | `js/athlete.js` | CC0-1.0 | Quaternius — Universal Animation Library 1 + 2 |
 | Menu music (5 tracks) | `audio/menu/*.mp3` | `js/menu-music.js` | See note below | Google generative AI |
+
+## Athlete body (Phase 11)
+
+- **File:** `3d/athlete.glb` (1.6 MB): the UAL mannequin (realistic proportions,
+  65-bone humanoid skeleton) plus 37 authored clips: idle, walk, jog, sprint,
+  back-pedal, strafes, turning leans, kick, slide tackle, hits, knock-downs and
+  get-ups, celebrations and dejection.
+- **Source:** Quaternius, *Universal Animation Library* and *Universal Animation
+  Library 2* (Unreal-Godot GLB exports), obtained from the CC0 mirror
+  github.com/tilakpatell/tilakverse-assets (packs "exactly as downloaded").
+- **Licence:** CC0 1.0 (public domain). No attribution required; credited anyway
+  in ABOUT → CREDITS.
+- **Rebuild:** `node tools/build-athlete.mjs UAL1.glb UAL2.glb 3d/athlete.glb`
+  (needs `@gltf-transform/core`, `/functions` and `/extensions`).
+- Kits, faces, hair and shirt numbers are generated in code (`js/athlete.js`).
 
 ## Menu music
 

@@ -40,9 +40,16 @@ LG.Player = function (def, team, idx) {
   var glbSlot = scope <= 0 ? false
     : scope === 1 ? (team === 0 && idx === 0)
       : (isKeeper ? scope >= 3 : scope >= 2);
-  this.model = (useGlb && glbSlot)
+  // Phase 11: the realistic athlete body (real authored clips) is the
+  // shipped default; the previous GLB + procedural bodies stay as fallbacks
+  var ath = null;
+  try {
+    var wantAth = !(LG.Config && LG.Config.player && LG.Config.player.athlete === 0);
+    if (wantAth && LG.Athlete && LG.Athlete.ready()) ath = LG.Athlete.build(def, { idx: idx, team: team });
+  } catch (e) { ath = null; }
+  this.model = ath || ((useGlb && glbSlot)
     ? (LG.RealPlayer.buildForTest(def) || LG.Models.buildCharacter(def))
-    : LG.Models.buildCharacter(def);
+    : LG.Models.buildCharacter(def));
   this.glbModel = !!(this.model && this.model.glb);
   this.model.group.scale.set(S, S, S);
   this.x = 0; this.z = 0;

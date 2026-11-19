@@ -201,7 +201,17 @@
     //   2. only then is the cover lifted (no flash of empty canvas), and
     //   3. the court probes — they fetch every court png — start afterwards so
     //      they never fight the first frame for bandwidth or decode time.
-    requestAnimationFrame(function () {
+    // Phase 11: the cover also waits (max 12 s) for the athlete body, so the
+    // first match never starts on the fallback bodies just because the
+    // model was still downloading. A failed load lifts the cover at once.
+    var athT0 = nowMs();
+    function athleteSettled() {
+      if (!LG.Athlete || !LG.Athlete.status) return true;
+      var ph = LG.Athlete.status().phase;
+      return ph !== 'loading' || nowMs() - athT0 > 12000;
+    }
+    function reveal() {
+      if (!athleteSettled()) { requestAnimationFrame(reveal); return; }
       renderer.render(scene, camera);
       hideLoading();
       if (LG.Courts) {
@@ -215,7 +225,8 @@
       scheduleViewportLayout();
       lastNow = nowSec();
       requestAnimationFrame(loop);
-    });
+    }
+    requestAnimationFrame(reveal);
   }
 
   var lastRotate = null;
@@ -2095,6 +2106,15 @@
       if (UIState === 'result' && LG.Input.pressed('rematch')) LG.eventBus.emit('rematchRequested');
       camera.position.set(0, 19, 24);
       camera.lookAt(0, 0, 0);
+    }
+
+    // review hook (tools/look.js): a parked camera wins over the loop's own
+    // pose for this frame only. Absent in normal play — one property read.
+    var lc = window.__lookCam;
+    if (lc && lc.p && lc.l) {
+      camera.position.set(lc.p[0], lc.p[1], lc.p[2]);
+      camera.lookAt(lc.l[0], lc.l[1], lc.l[2]);
+      if (lc.f && Math.abs(camera.fov - lc.f) > 0.01) { camera.fov = lc.f; camera.updateProjectionMatrix(); }
     }
 
     renderer.render(scene, camera);

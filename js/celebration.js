@@ -85,6 +85,17 @@ LG.Celebration = (function () {
 
   function stop() { current = null; }
 
+  // ---- Phase 11: clip-driven bodies (js/athlete.js) ----
+  // The athlete plays REAL authored clips; the limb helpers below no-op on
+  // it (limbs/body are null), so each role names a clip here instead.
+  // emote() is idempotent per name, so calling it every frame is cheap.
+  function clip(p, name) {
+    var a = p && p.model && p.model.clipDriven && p.model.anim;
+    if (!a || !a.emote || !name) return;
+    var left = current ? Math.max(0.4, current.dur - current.t + 0.4) : 2;
+    a.emote(name, { hold: true, dur: left });
+  }
+
   // ---- pose helpers — direct limb angles, no animation graph ----
 
   function limbs(p) { return (p && p.model && p.model.limbs) || null; }
@@ -286,11 +297,14 @@ LG.Celebration = (function () {
       switch (current.type) {
         case 'arms':
           armsUp(scorer, true, t, ph);
+          clip(scorer, 'celebrate');
           break;
         case 'wide':
           armsWide(scorer, t, ph);
+          clip(scorer, 'dance');
           break;
         case 'slide': {
+          clip(scorer, t < 0.7 ? 'slide_start' : (t < current.dur - 0.6 ? 'slide_loop' : 'slide_exit'));
           // knee-slide approximation — presentation only, zero travel:
           // gather, drop into a leaning slide with the legs out, rise.
           var low = t > 0.35 && t < current.dur - 0.55;
@@ -315,19 +329,22 @@ LG.Celebration = (function () {
           var pa = current.pointAt;
           if (pa) faceToward(scorer, pa.x, pa.z, 0.12);
           pointArm(scorer);
+          clip(scorer, 'yes');
           break;
         }
         case 'signature':
           // signature: arms-up then a little spin (the cinematic knows to
           // leave this variant's facing to us — see goal-cinematic.js)
           armsUp(scorer, true, t, ph);
-          scorer.facing += 2.8 * dt;
+          if (scorer.model && scorer.model.clipDriven) clip(scorer, 'backflip');
+          else scorer.facing += 2.8 * dt;
           if (scorer.model && scorer.model.group) scorer.model.group.rotation.y = scorer.facing;
           break;
         case 'huddle':
         case 'group':
           // scorer stays central while the band gathers (travel disabled)
           armsUp(scorer, true, t, ph);
+          clip(scorer, 'celebrate');
           pitch(scorer, Math.sin(t * 7.5 + ph) * 0.05);
           break;
         case 'calm':
@@ -347,10 +364,12 @@ LG.Celebration = (function () {
       if (role === 'wkeep') {
         // scoring keeper: a small, late raise — not part of the band
         armsUp(p, t > 0.5 && t < current.dur - 0.4, t, ph, 0.8);
+        if (t > 0.5) clip(p, 'yes');
         if (scorer) faceToward(p, scorer.x, scorer.z, 0.06);
       } else if (current.type === 'huddle' || current.type === 'group') {
         armsUp(p, true, t, ph);
         breathe(p, t, ph);
+        clip(p, 'celebrate');
         if (scorer) faceToward(p, scorer.x, scorer.z, 0.1);
       } else if (current.type === 'calm' || role === 'own') {
         armsDown(p);
@@ -358,6 +377,7 @@ LG.Celebration = (function () {
       } else if (role === 'close') {
         // strong + immediate; the cinematic may have run them into a slot
         var mode = (p.idx + current.team) % 3;
+        clip(p, mode === 1 ? 'dance' : (mode === 2 ? 'yes' : 'celebrate'));
         if (mode === 1) {
           armsWide(p, t, ph);
           if (scorer) faceToward(p, scorer.x, scorer.z, 0.1);
@@ -372,6 +392,7 @@ LG.Celebration = (function () {
       } else {
         // far / stationary: weaker (depth 0.75), later, never travels
         var on = t > 0.45 && t < current.dur - 0.5;
+        if (on) clip(p, (p.idx % 2) === 0 ? 'yes' : 'idle_look');
         if ((p.idx % 2) === 0) armsUp(p, on, t, ph, 0.75);
         else if (p.model && p.model.body) p.model.body.rotation.x = on ? Math.sin(t * 5 + ph) * 0.06 : 0;
         if ((p.idx % 2) !== 0) armsDown(p);
@@ -387,6 +408,7 @@ LG.Celebration = (function () {
       var lrole = roleOf(p);
       if (lrole === 'lkeep') {
         // conceding keeper: brief fold toward the net, then reset
+        clip(p, t < 1.3 ? 'no' : 'fold_arms');
         if (t < 1.3) {
           handsOnHead(p);
           pitch(p, 0.3);
@@ -401,15 +423,19 @@ LG.Celebration = (function () {
         p.vx = 0;
         p.vz = 0;
       } else if (lrole === 'ldown') {
+        clip(p, 'crying');
         handsOnHead(p);
         pitch(p, 0.24);                 // head lowered
       } else if (lrole === 'lhips') {
+        clip(p, 'tired');
         handsHips(p);
         pitch(p, -0.05);
       } else if (lrole === 'lturn') {
+        clip(p, 'no');
         armsDown(p);
         p.facing += 0.4 * dt;           // slowly turns away
       } else {
+        clip(p, t < 0.9 ? 'surprise' : 'fold_arms');
         armsDown(p);
         pitch(p, -0.06);
         if (scorer) faceToward(p, scorer.x, scorer.z, 0.07);  // stares at it

@@ -34,6 +34,9 @@ LG.Config = {
   // widens spacing exactly as much as it widens the silhouette.
   // ------------------------------------------------------------
   player: {
+    athlete: 1,         // Phase 11: 1 = realistic athlete body with real clips
+                        // (js/athlete.js, 3d/athlete.glb); 0 = previous bodies.
+                        // Try index.html?athlete=0 to compare.
     scale: 1.35,        // baseline — 1.35x the original body size
     mobileScale: 1.05,  // extra bump on phones (small screens) -> ~1.42 total
     rig: 1,             // 1 = skinned humanoid rig (AnimationMixer) as the shipped
