@@ -38,6 +38,8 @@ LG.Crowd = (function () {
   var root = null;
   var bound = false;
   var t = 0, cheerT = 0, swellT = 0;
+  var groanT = 0, clapT = 0, shotAt = -99, goalAt = -99, scoringSec = null;
+  var GROAN_DUR = 1.6, CLAP_DUR = 1.8;
   var initMs = 0;
   // goal-reaction field (3D.4): per-spectator amplitude/delay primed once
   // per goal, read back by stats() for the probes
@@ -120,9 +122,15 @@ LG.Crowd = (function () {
   }
 
   function buildGeometries() {
+    // Phase 11: rounded limbs (capsules) instead of boxes
+    function cap(r, len, x, y, z) {
+      var g = new THREE.CapsuleGeometry(r, len, 2, 6);
+      g.translate(x, y, z);
+      return g;
+    }
     var legs = merge([
-      box(0.115, 0.70, 0.14, -0.105, -0.36, 0.012),
-      box(0.115, 0.70, 0.14, 0.105, -0.36, 0.012),
+      cap(0.062, 0.58, -0.105, -0.36, 0.012),
+      cap(0.062, 0.58, 0.105, -0.36, 0.012),
       box(0.125, 0.075, 0.21, -0.105, -0.70, 0.045),
       box(0.125, 0.075, 0.21, 0.105, -0.70, 0.045),
     ]);
@@ -136,7 +144,8 @@ LG.Crowd = (function () {
     var head = new THREE.SphereGeometry(0.115, 8, 6);
     head.translate(0, 0.12, 0.012);   // origin -> neck pivot (top at +0.915)
 
-    var arm = box(0.085, 0.30, 0.085, 0, -0.15, 0);   // origin -> shoulder
+    var arm = new THREE.CapsuleGeometry(0.046, 0.24, 2, 6);
+    arm.translate(0, -0.16, 0);                       // origin -> shoulder
     var hand = new THREE.SphereGeometry(0.055, 5, 4);
     hand.translate(0, -0.33, 0);                      // origin -> shoulder
 
@@ -185,6 +194,9 @@ LG.Crowd = (function () {
       headK: jit(0.7, 1.4),
       armK: jit(0.9, 1.1),
       reactK: 1,                                  // goal reaction amplitude
+      // Phase 11: individual life — own arms, own gaze, own idle actions
+      aLx: -0.1, aLz: 0, aRx: -0.1, aRz: 0, hy: 0, ty: 0, tilt: 0,
+      actOff: jit(0, 30), actDur: jit(4.5, 9.5), seed: (prand() * 4294967296) >>> 0,
       rDelay: SEC_DELAY[sec] + (g ? g.micro : 0), // stable per-spec delay
       aLegs: sit ? anchor(HIP, -1.0 + jit(-0.12, 0.12), 0, 0) : anchor(HIP, 0, 0, 0),
       aHip: anchor(HIP, 0, 0, 0),
@@ -291,7 +303,7 @@ LG.Crowd = (function () {
     if (!g || !g.scorer || !specs.length) return;
     try {
       var sx = g.scorer.x, sz = g.scorer.z;
-      var scoringSec = (g.isOwnGoal || typeof g.team !== 'number') ? null
+      scoringSec = (g.isOwnGoal || typeof g.team !== 'number') ? null
         : (g.team === 0 ? 'home' : 'away');
       // 3D.6: one shared intensity factor from the celebration variant —
       // decided once, applied before the section multipliers below
@@ -320,11 +332,17 @@ LG.Crowd = (function () {
 
   function bind() {
     if (bound || !LG.eventBus || !LG.eventBus.on) return;
-    LG.eventBus.on('goal', function (g) { cheerT = CHEER_DUR; primeReact(g); });
+    LG.eventBus.on('goal', function (g) { cheerT = CHEER_DUR; goalAt = t; groanT = 0; primeReact(g); });
+    // a save or a big tackle earns applause; a shot that doesn't score gets
+    // the hands-on-heads "ooh" a moment later (see update)
+    LG.eventBus.on('keeperSave', function () { clapT = CLAP_DUR; });
+    LG.eventBus.on('postHit', function () { groanT = GROAN_DUR; });
+    LG.eventBus.on('kickoff', function () { scoringSec = null; });
     // shot reaction: only real efforts swell (the weak poke emits power 0.4)
     LG.eventBus.on('shoot', function (ev) {
       if (ev && typeof ev.power === 'number' && ev.power < 0.5) return;
       swellT = SWELL_DUR;
+      shotAt = t;
     });
     bound = true;
   }
@@ -333,6 +351,7 @@ LG.Crowd = (function () {
   var _B = new THREE.Matrix4(), _T = new THREE.Matrix4(), _R = new THREE.Matrix4();
   var _P = new THREE.Vector3(), _S = new THREE.Vector3(), _Q = new THREE.Quaternion();
   var _E = new THREE.Euler(0, 0, 0, 'YXZ');
+  var _E2 = new THREE.Euler(0, 0, 0, 'XYZ');
   var PART_ORDER = ['legs', 'hip', 'torso', 'head', 'arm', 'hand'];
 
   function update(dt) {
@@ -340,6 +359,19 @@ LG.Crowd = (function () {
     t += dt;
     if (cheerT > 0) cheerT = Math.max(0, cheerT - dt);
     if (swellT > 0) swellT = Math.max(0, swellT - dt);
+    if (groanT > 0) groanT = Math.max(0, groanT - dt);
+    if (clapT > 0) clapT = Math.max(0, clapT - dt);
+    // a real shot that has not become a goal 1.1 s later = "ooh"
+    if (shotAt > -90 && t - shotAt > 1.1) {
+      if (goalAt < shotAt) groanT = Math.max(groanT, GROAN_DUR);
+      shotAt = -99;
+    }
+    // where the ball is: fans watch it, and the near end leans in
+    var bx = 0, bz = 0, hasBall = false;
+    try {
+      var M = LG.Match;
+      if (M && M.ball && isFinite(M.ball.x)) { bx = M.ball.x; bz = M.ball.z; hasBall = true; }
+    } catch (e) { hasBall = false; }
 
     var elapsed = CHEER_DUR - cheerT;
     var swellE = SWELL_DUR - swellT;
@@ -403,8 +435,59 @@ LG.Crowd = (function () {
       var head = gg.hI + b2 * gg.hC;
       var sway = gg.sI + b2 * gg.sC;
 
+      // ---- Phase 11: individual behaviour on top of the group curves ----
+      var k = Math.min(1, dt * 6);
+      // gaze: follow the ball (head mostly, shoulders a little)
+      if (hasBall) {
+        var want = Math.atan2(bx - s.x, bz - s.z) - s.yaw;
+        want = Math.atan2(Math.sin(want), Math.cos(want));
+        if (want > 1.25) want = 1.25; else if (want < -1.25) want = -1.25;
+        s.hy += (want - s.hy) * Math.min(1, dt * (2.2 + (s.seed & 3) * 0.4));
+      }
+      var dB = hasBall ? Math.sqrt((bx - s.x) * (bx - s.x) + (bz - s.z) * (bz - s.z)) : 99;
+      var tense = dB < 15 ? (1 - dB / 15) : 0;          // the ball is near: lean in, stop fidgeting
+      // idle action, picked per time slot from a stable hash (no RNG)
+      var slot = Math.floor((t + s.actOff) / s.actDur);
+      var hsh = ((s.seed ^ (slot * 2654435761)) >>> 0) % 100;
+      var act = tense > 0.35 ? 'watch'
+        : hsh < 38 ? 'rest' : hsh < 52 ? 'clap' : hsh < 62 ? 'point' : hsh < 72 ? 'hips'
+        : hsh < 80 ? 'wave' : hsh < 90 ? 'fold' : 'talk';
+      var lx = -0.08, lz = 0, rx = -0.08, rz = 0, tilt = 0, look = 0;
+      var tt = t + s.actOff;
+      switch (act) {
+        case 'clap': lx = rx = -1.15; lz = -0.42 + 0.2 * Math.sin(tt * 13); rz = -lz; break;
+        case 'point': rx = -1.55; rz = -0.12; break;
+        case 'hips': lx = rx = 0.22; lz = 0.62; rz = -0.62; break;
+        case 'wave': rx = -2.75; rz = -0.15 + 0.32 * Math.sin(tt * 7.5); break;
+        case 'fold': lx = rx = -0.62; lz = -0.75; rz = 0.75; break;
+        case 'talk': look = ((s.seed >> 3) & 1 ? 1 : -1) * 0.95; rx = -0.45 + 0.18 * Math.sin(tt * 3.1); break;
+        case 'watch': tilt = 0.14 * tense; break;
+      }
+      // events override the idle action
+      var concede = cheerT > 0 && scoringSec && s.sec !== 'side' && s.sec !== scoringSec;
+      if (concede) {                                   // hands on heads, slumped
+        lx = rx = -2.75; lz = -0.55; rz = 0.55; tilt = 0.18; arm = 0; bounce = 0;
+      } else if (groanT > 0 && cheerT <= 0) {          // "ooh" — so close
+        var gk2 = Math.min(1, (GROAN_DUR - groanT) / 0.2) * Math.min(1, groanT / 0.35);
+        lx = lx * (1 - gk2) + -2.8 * gk2; rx = rx * (1 - gk2) + -2.8 * gk2;
+        lz = lz * (1 - gk2) + -0.5 * gk2; rz = rz * (1 - gk2) + 0.5 * gk2;
+        tilt = -0.1 * gk2;
+      } else if (clapT > 0 && cheerT <= 0) {           // applause
+        lx = rx = -1.2; lz = -0.42 + 0.2 * Math.sin(t * 15 + (s.seed & 7)); rz = -lz;
+      }
+      s.aLx += (lx - s.aLx) * k; s.aLz += (lz - s.aLz) * k;
+      s.aRx += (rx - s.aRx) * k; s.aRz += (rz - s.aRz) * k;
+      s.ty += (look - s.ty) * Math.min(1, dt * 3);
+      s.tilt += (tilt - s.tilt) * Math.min(1, dt * 4);
+      // the group cheer still drives raised arms on a goal (both arms)
+      var cheerW = concede ? 0 : m2;
+      var aLx = s.aLx * (1 - cheerW) + arm * cheerW, aRx = s.aRx * (1 - cheerW) + arm * cheerW;
+      var aLz = s.aLz * (1 - cheerW), aRz = s.aRz * (1 - cheerW);
+      head = head * 0.35 + s.hy * 0.85 + s.ty;
+      lean = lean + s.tilt;
+
       _P.set(s.x, s.baseY + bounce * s.bobK, s.z);
-      _E.set(0, s.yaw + sway * s.swayK, 0);
+      _E.set(0, s.yaw + sway * s.swayK + s.hy * 0.18, 0);
       _Q.setFromEuler(_E);
       _S.setScalar(s.scale);
       _B.compose(_P, _Q, _S);
@@ -424,11 +507,14 @@ LG.Crowd = (function () {
       _T.multiply(_R);
       parts.head.setMatrixAt(i, _T);
 
-      _R.makeRotationX(arm * s.armK);
+      _E2.set(aLx * s.armK, 0, aLz);
+      _R.makeRotationFromEuler(_E2);
       _T.multiplyMatrices(_B, s.aArmL);
       _T.multiply(_R);
       parts.arm.setMatrixAt(i * 2, _T);
       parts.hand.setMatrixAt(i * 2, _T);
+      _E2.set(aRx * s.armK, 0, aRz);
+      _R.makeRotationFromEuler(_E2);
       _T.multiplyMatrices(_B, s.aArmR);
       _T.multiply(_R);
       parts.arm.setMatrixAt(i * 2 + 1, _T);

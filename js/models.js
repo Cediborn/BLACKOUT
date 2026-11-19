@@ -514,19 +514,97 @@ var bw = w / 5, bh = h / 7;
   }
 
   // city building facade: colored wall with a grid of windows (lit/dark mix)
+  // Phase 11: a real facade. 64 px per window cell (was 8): wall texture
+  // (brick courses or render), floor ledges, framed windows with sills,
+  // sky-reflecting glass, blinds/curtains, warm lit rooms and the odd AC
+  // unit. The lit windows also go into an emissive map (tex.userData.lit)
+  // so the city glows at night through LG.Lighting's emissive pass.
   function cityBuildingTex(hexColor, cols, rows) {
     cols = cols || 4; rows = rows || 5;
-    return LG.Util.makeCanvasTexture(function (g, w, h) {
+    var CW = 64, CH = 72;
+    var W = cols * CW, H = rows * CH;
+    var lit = [];
+    var seed = 0;
+    for (var q = 0; q < hexColor.length; q++) seed = (seed * 31 + hexColor.charCodeAt(q)) >>> 0;
+    seed = (seed + cols * 977 + rows * 131) >>> 0;
+    function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+    function shade(hex, k) {
+      var n = parseInt(hex.slice(1), 16);
+      var r = Math.max(0, Math.min(255, Math.round(((n >> 16) & 255) * k)));
+      var g = Math.max(0, Math.min(255, Math.round(((n >> 8) & 255) * k)));
+      var b = Math.max(0, Math.min(255, Math.round((n & 255) * k)));
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    var brick = rnd() < 0.55;
+    var tex = LG.Util.makeCanvasTexture(function (g, w, h) {
       g.fillStyle = hexColor; g.fillRect(0, 0, w, h);
-      var bw = w / cols, bh = h / rows;
-      for (var r = 0; r < rows; r++) {
-        for (var c = 0; c < cols; c++) {
-          var lit = Math.random() > 0.45;
-          g.fillStyle = lit ? 'rgba(255,225,130,0.75)' : 'rgba(20,25,35,0.85)';
-          g.fillRect(c * bw + bw * 0.14, r * bh + bh * 0.14, bw * 0.72, bh * 0.65);
+      // wall surface
+      if (brick) {
+        for (var y = 0; y < h; y += 6) {
+          var off = (y / 6) % 2 ? 7 : 0;
+          for (var x = -off; x < w; x += 14) {
+            g.fillStyle = shade(hexColor, 0.86 + rnd() * 0.24);
+            g.fillRect(x + 1, y + 1, 12, 4);
+          }
+        }
+      } else {
+        for (var n2 = 0; n2 < w * h / 40; n2++) {
+          g.fillStyle = shade(hexColor, 0.9 + rnd() * 0.2);
+          g.fillRect(rnd() * w, rnd() * h, 2, 2);
         }
       }
-    }, cols * 8, rows * 8);
+      // floor ledges
+      for (var r = 0; r <= rows; r++) {
+        g.fillStyle = shade(hexColor, 1.28);
+        g.fillRect(0, r * CH - 3, w, 4);
+        g.fillStyle = 'rgba(0,0,0,0.22)';
+        g.fillRect(0, r * CH + 1, w, 2);
+      }
+      for (r = 0; r < rows; r++) {
+        lit[r] = [];
+        for (var c = 0; c < cols; c++) {
+          var x0 = c * CW + 12, y0 = r * CH + 12, ww = CW - 24, wh = CH - 30;
+          // frame + sill
+          g.fillStyle = '#e8e4da'; g.fillRect(x0 - 3, y0 - 3, ww + 6, wh + 6);
+          g.fillStyle = shade(hexColor, 0.55); g.fillRect(x0 - 5, y0 + wh + 3, ww + 10, 4);
+          var on = rnd() < 0.42;
+          lit[r][c] = on;
+          if (on) {
+            var gr = g.createLinearGradient(0, y0, 0, y0 + wh);
+            gr.addColorStop(0, '#ffe7a6'); gr.addColorStop(1, '#f2b65e');
+            g.fillStyle = gr; g.fillRect(x0, y0, ww, wh);
+            if (rnd() < 0.5) { g.fillStyle = 'rgba(120,60,40,0.55)'; g.fillRect(x0, y0, ww * 0.28, wh); g.fillRect(x0 + ww * 0.72, y0, ww * 0.28, wh); }
+          } else {
+            var gs = g.createLinearGradient(0, y0, 0, y0 + wh);
+            gs.addColorStop(0, '#7f9fbf'); gs.addColorStop(0.55, '#2c3c50'); gs.addColorStop(1, '#1a2330');
+            g.fillStyle = gs; g.fillRect(x0, y0, ww, wh);
+            g.fillStyle = 'rgba(255,255,255,0.16)';                 // reflection streak
+            g.beginPath(); g.moveTo(x0 + ww * 0.15, y0); g.lineTo(x0 + ww * 0.42, y0); g.lineTo(x0 + ww * 0.1, y0 + wh); g.lineTo(x0, y0 + wh); g.closePath(); g.fill();
+            if (rnd() < 0.35) {                                     // blinds
+              g.fillStyle = 'rgba(220,214,200,0.75)';
+              var bl = wh * (0.3 + rnd() * 0.5);
+              for (var yy = 0; yy < bl; yy += 4) g.fillRect(x0, y0 + yy, ww, 2);
+            }
+          }
+          // mullion
+          g.fillStyle = '#e8e4da'; g.fillRect(x0 + ww / 2 - 1, y0, 2, wh);
+          // AC unit
+          if (rnd() < 0.12) { g.fillStyle = '#c9c9c4'; g.fillRect(x0 + ww * 0.55, y0 + wh - 12, 16, 12); g.fillStyle = '#8d8d88'; g.fillRect(x0 + ww * 0.55 + 2, y0 + wh - 10, 12, 2); }
+        }
+      }
+    }, W, H);
+    // emissive map: only the lit windows
+    var glow = LG.Util.makeCanvasTexture(function (g, w, h) {
+      g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+      for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+        if (!lit[r] || !lit[r][c]) continue;
+        g.fillStyle = '#ffd890';
+        g.fillRect(c * CW + 12, r * CH + 12, CW - 24, CH - 30);
+      }
+    }, W, H);
+    tex.userData = tex.userData || {};
+    tex.userData.lit = glow;
+    return tex;
   }
 
   // striped awning texture (canvas for a shop front canopy)

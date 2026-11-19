@@ -24,7 +24,8 @@ LG.Living = (function () {
   var clock = 0;            // shared idle clock for watchers
   var sub = false;          // eventBus subscription guard
 
-  var CARS = 12, BIKES = 8, PEDS = 14, WATCHERS = 10;
+  var CARS = 10, BIKES = 8, PEDS = 14, WATCHERS = 10;
+  var _pp = {};
   // sidewalk ring: every point stays inside the S/N (z<=35) and E/W
   // (x<=30) sidewalk bands, clear of benches, bollards and the crowd
   var WALK = 28;
@@ -46,6 +47,51 @@ LG.Living = (function () {
     else if ((s -= 2 * Rx) < 2 * Rz) { p.x = -Rx; p.z = Rz - s; p.dx = 0; p.dz = -1; }
     else { s -= 2 * Rz; p.x = -Rx + s; p.z = -Rz; p.dx = 1; p.dz = 0; }
     return p;
+  }
+
+  // ---- Phase 11 traffic: a rounded-corner one-way ring (arc-length) ----
+  // Cars follow the outer lane of the road ring, slow for the corners, keep
+  // their distance to the car ahead and brake (lights on) when they must.
+  var LANE = { rx: 34.4, rz: 39.5, r: 5.5 };
+  var PATH = null;
+  function buildPath() {
+    var rx = LANE.rx, rz = LANE.rz, r = LANE.r, segs = [];
+    // same travel order as ringPos: east side +z, south side -x, west -z, north +x
+    var C = [[rx - r, rz - r, 0], [-(rx - r), rz - r, Math.PI / 2], [-(rx - r), -(rz - r), Math.PI], [rx - r, -(rz - r), -Math.PI / 2]];
+    var starts = [[rx, -(rz - r), 0, 1], [rx - r, rz, -1, 0], [-rx, rz - r, 0, -1], [-(rx - r), -rz, 1, 0]];
+    var lens = [2 * (rz - r), 2 * (rx - r), 2 * (rz - r), 2 * (rx - r)];
+    for (var i = 0; i < 4; i++) {
+      segs.push({ kind: 'line', x: starts[i][0], z: starts[i][1], dx: starts[i][2], dz: starts[i][3], len: lens[i] });
+      segs.push({ kind: 'arc', cx: C[i][0], cz: C[i][1], a0: C[i][2], len: Math.PI / 2 * r });
+    }
+    var total = 0;
+    for (i = 0; i < segs.length; i++) { segs[i].s0 = total; total += segs[i].len; }
+    PATH = { segs: segs, len: total };
+  }
+  function pathAt(s, out) {
+    if (!PATH) buildPath();
+    var L = PATH.len;
+    s = ((s % L) + L) % L;
+    var segs = PATH.segs, i = 0;
+    while (i < segs.length - 1 && s >= segs[i + 1].s0) i++;
+    var g = segs[i], u = s - g.s0;
+    out = out || {};
+    if (g.kind === 'line') {
+      out.x = g.x + g.dx * u; out.z = g.z + g.dz * u;
+      out.yaw = Math.atan2(g.dx, g.dz); out.curve = 0;
+    } else {
+      var a = g.a0 + u / LANE.r;      // centre-relative angle (0 = +x)
+      out.x = g.cx + Math.cos(a) * LANE.r; out.z = g.cz + Math.sin(a) * LANE.r;
+      out.yaw = Math.atan2(-Math.sin(a), Math.cos(a));
+      out.curve = 1 / LANE.r;
+    }
+    return out;
+  }
+  // how sharp the road is a little ahead (for corner braking)
+  function curveAhead(s) {
+    var p = {}, k = 0;
+    for (var d = 0; d <= 12; d += 3) { pathAt(s + d, p); if (p.curve > k) k = p.curve; }
+    return k;
   }
 
   function mesh(color) {
@@ -301,12 +347,28 @@ LG.Living = (function () {
     // ---- cars: traffic on the road ring's outer lane ----
     var carCols = [0xe74c3c, 0x3498db, 0xf1c40f, 0x2ecc71, 0x9b59b6, 0xe67e22,
                    0x1abc9c, 0xd35400, 0x34495e, 0xc0392b, 0x2980b9, 0x27ae60];
+    if (!PATH) buildPath();
     for (i = 0; i < CARS; i++) {
-      var car = makeCar(carCols[i % carCols.length]);
-      p = ringPos(CAR_RX, CAR_RZ, (i / CARS) % 1);
-      car.position.set(p.x, 0, p.z);
-      scene.add(car);
-      movers.push({ kind: 'car', g: car, t: (i / CARS) % 1, speed: 0.04 + Math.random() * 0.015, Rx: CAR_RX, Rz: CAR_RZ, dir: i % 3 === 0 ? -1 : 1 });
+      if (LG.Vehicles && LG.Vehicles.make) {
+        var spec = LG.Vehicles.fleet(i);
+        var v = LG.Vehicles.make(spec.type, spec.colour, { taxi: spec.taxi });
+        var s0 = (i / CARS) * PATH.len;
+        pathAt(s0, _pp);
+        v.group.position.set(_pp.x, 0, _pp.z);
+        v.group.rotation.y = _pp.yaw;
+        scene.add(v.group);
+        movers.push({
+          kind: 'car', v: v, g: v.group, s: s0,
+          speed: 0, cruise: 6.2 + ((i * 37) % 10) * 0.32,   // world units / s
+          roll: 0, pitch: 0, steer: 0, brake: 0,
+        });
+      } else {
+        var car = makeCar(carCols[i % carCols.length]);
+        p = ringPos(CAR_RX, CAR_RZ, (i / CARS) % 1);
+        car.position.set(p.x, 0, p.z);
+        scene.add(car);
+        movers.push({ kind: 'carbox', g: car, t: (i / CARS) % 1, speed: 0.04 + Math.random() * 0.015, Rx: CAR_RX, Rz: CAR_RZ, dir: 1 });
+      }
     }
 
     // ---- bikes: quiet outer loop ----
@@ -366,10 +428,13 @@ LG.Living = (function () {
     dt = dt || 0.016;
     var step = dt * 60;                 // seconds -> 60fps frames
 
-    // ---- wheeled movers follow their rings ----
+    // ---- traffic: follow the lane, keep the gap, brake for corners ----
+    updateTraffic(dt);
+
+    // ---- bikes (and the legacy box cars) follow their rings ----
     for (i = 0; i < movers.length; i++) {
       m2 = movers[i];
-      if (m2.kind !== 'car' && m2.kind !== 'bike') continue;
+      if (m2.kind !== 'carbox' && m2.kind !== 'bike') continue;
       m2.t = (m2.t + (m2.dir * m2.speed * step * 0.02)) % 1;
       if (m2.t < 0) m2.t += 1;
       p = ringPos(m2.Rx, m2.Rz, m2.t);
@@ -406,6 +471,62 @@ LG.Living = (function () {
     flushFigures(fig);
   }
 
+  var _cars = [];
+  function updateTraffic(dt) {
+    var i, c;
+    _cars.length = 0;
+    for (i = 0; i < movers.length; i++) if (movers[i].kind === 'car') _cars.push(movers[i]);
+    if (!_cars.length || !PATH) return;
+    var L = PATH.len;
+    _cars.sort(function (a, b) { return a.s - b.s; });
+    var night = false;
+    try { night = !!(LG.Settings && LG.Settings.timeOfDay && LG.Settings.timeOfDay() === 'night'); } catch (e) { night = false; }
+    if (LG.Vehicles && LG.Vehicles.setNight) LG.Vehicles.setNight(night);
+    for (i = 0; i < _cars.length; i++) {
+      c = _cars[i];
+      var ahead = _cars[(i + 1) % _cars.length];
+      var gap = ((ahead.s - c.s) % L + L) % L - (ahead.v.length + c.v.length) / 2;
+      if (_cars.length === 1) gap = 1e9;
+      // target speed: cruise, slowed for curves ahead and for the car ahead
+      var k = curveAhead(c.s);
+      var vt = c.cruise;
+      if (k > 0) vt = Math.min(vt, 3.6);
+      var safe = 2.2 + c.speed * 0.9;                 // ~1 s headway + standstill gap
+      if (gap < safe) vt = Math.min(vt, Math.max(0, (gap - 2.0) * 1.2));
+      var acc = vt > c.speed ? 2.6 : -7.5;
+      var nv = c.speed + acc * dt;
+      nv = acc > 0 ? Math.min(vt, nv) : Math.max(vt, nv);
+      var decel = (c.speed - nv) / Math.max(dt, 1e-4);
+      c.speed = Math.max(0, nv);
+      c.s = (c.s + c.speed * dt) % L;
+      pathAt(c.s, _pp);
+      c.g.position.set(_pp.x, 0, _pp.z);
+      c.g.rotation.y = _pp.yaw;
+      // springs: roll into corners, nose dips under braking
+      var lat = _pp.curve * c.speed * c.speed;        // lateral accel
+      c.roll += (Math.min(0.06, lat * 0.012) - c.roll) * Math.min(1, dt * 5);
+      c.pitch += (Math.max(-0.035, Math.min(0.03, decel * 0.006)) - c.pitch) * Math.min(1, dt * 6);
+      c.v.body.rotation.z = c.roll;
+      c.v.body.rotation.x = c.pitch;
+      // wheels: spin with distance, front pair steers with the curve
+      var spin = c.speed * dt / c.v.wheelR;
+      c.steer += ((_pp.curve > 0 ? 0.34 : 0) - c.steer) * Math.min(1, dt * 4);
+      for (var w = 0; w < c.v.wheels.length; w++) {
+        var wh = c.v.wheels[w];
+        wh.spin.rotation.x += spin;
+        if (wh.front) wh.hub.rotation.y = c.steer;
+      }
+      // brake lights: bright while slowing (and always a little at night)
+      var bk = decel > 0.8 || (c.speed < 0.3 && vt < 0.5) ? 1 : 0;
+      c.brake += (bk - c.brake) * Math.min(1, dt * 12);
+      c.v.brake.emissiveIntensity = (night ? 0.9 : 0.25) + c.brake * 2.2;
+    }
+  }
+
+  function trafficInfo() {
+    return _cars.map(function (c) { return { s: c.s, speed: c.speed, brake: c.brake }; });
+  }
+
   // read-only placement snapshot for the headless boot harness
   function info() {
     var w = [];
@@ -416,5 +537,5 @@ LG.Living = (function () {
     };
   }
 
-  return { build: build, update: update, cheer: cheer, info: info };
+  return { build: build, update: update, cheer: cheer, info: info, traffic: trafficInfo, pathAt: function (s) { return pathAt(s, {}); }, pathLength: function () { if (!PATH) buildPath(); return PATH.len; } };
 })();

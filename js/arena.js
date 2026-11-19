@@ -544,7 +544,10 @@ LG.Arena = (function () {
     function addBlock(x, z, w, h, d, fc, hasShop) {
       // building body
       var tex = LG.Models.cityBuildingTex(fc.hex, fc.cols, fc.rows);
-      var mat = new THREE.MeshLambertMaterial({ map: tex });
+      var litMap = tex.userData && tex.userData.lit;
+      var mat = litMap
+        ? new THREE.MeshLambertMaterial({ map: tex, emissive: 0xffffff, emissiveMap: litMap, emissiveIntensity: 0.55 })
+        : new THREE.MeshLambertMaterial({ map: tex });
       var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
       m.position.set(x, h / 2, z);
       m.receiveShadow = true; m.castShadow = true;
@@ -1081,7 +1084,21 @@ LG.Arena = (function () {
     var mats = colours.map(function(c) {
       return new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0.3 });
     });
+    var parkedN = 0;
     function addCar(x, z, rot, col) {
+      // Phase 11: real car shapes from the shared builder (box car fallback)
+      if (LG.Vehicles && LG.Vehicles.make) {
+        try {
+          var spec = LG.Vehicles.fleet(parkedN + 3);
+          var hex = LG.Vehicles.PAINT[(parkedN * 3 + 1) % LG.Vehicles.PAINT.length];
+          parkedN++;
+          var pv = LG.Vehicles.make(spec.type === 'van' && parkedN % 2 ? 'sedan' : spec.type, hex, { shareTail: true, taxi: parkedN === 4 });
+          pv.group.position.set(x, 0, z);
+          pv.group.rotation.y = rot;
+          g.add(pv.group);
+          return;
+        } catch (e) { /* fall through to the box car */ }
+      }
       var car = new THREE.Group();
       var body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 3.6), col);
       body.position.y = 0.55;

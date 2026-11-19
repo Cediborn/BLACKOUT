@@ -56,6 +56,7 @@ var ASSETS = [
   './js/athlete.js',
   './js/ball.js',
   './js/player.js',
+  './js/vehicles.js',
   './js/arena.js',
   './js/abilities.js',
   './js/ai.js',
