@@ -34,7 +34,7 @@ function fakeNode() {
   var n = {
     position: vec3(), rotation: vec3(), scale: vec3(), quaternion: vec3(),
     userData: {}, children: [], isMesh: false, visible: true, material: null, geometry: null,
-    shadow: { camera: { left: 0, right: 0, top: 0, bottom: 0, near: 0, far: 0 }, mapSize: { set: function () {} }, bias: 0 },
+    shadow: { camera: { left: 0, right: 0, top: 0, bottom: 0, near: 0, far: 0 }, mapSize: { x: 0, y: 0, set: function (x, y) { this.x = x; this.y = y; } }, bias: 0 },
     add: function (c) { n.children.push(c); return n; },
     remove: function () { return n; },
     traverse: function (cb) { cb(n); (n.children || []).forEach(function (c) { if (c && c.traverse) c.traverse(cb); }); return n; },
@@ -1489,6 +1489,7 @@ section('9. game modes + tournament (Phase 3D: once-only fixtures, mode-aware re
   var tm = window.LGMain.getMatch();
   check(!!tm && tm.opts.mode === 'tournament', 'match opts carry mode=tournament', tm && tm.opts.mode);
   check(!!(tm && tm.opts.awayIds && tm.opts.awayIds.length === 3), 'tournament pins the away trio', tm && tm.opts.awayIds);
+  check(!!tm && tm.opts.goldenGoal === true, 'a Street Cup fixture plays golden goal on a tie', tm && tm.opts.goldenGoal);
   check(T.snapshot().awaitingResult === true, 'fixture opened the once-only latch', T.snapshot().awaitingResult);
 
   // pause must not advance any tournament state
@@ -1888,6 +1889,95 @@ section('10. Phase 4 app polish (settings, about, how, volumes, data reset)');
     check(!!raw && raw.indexOf('"volMusic":0.5') >= 0, 'music volume persists to localStorage', raw);
   })();
   LG.Settings.setVolMusic(0.7);
+})();
+
+// ============================================================
+// PHASE 10 — PLAY NOW + GOLDEN GOAL HUD
+section('P10. PLAY NOW — one tap into a quick match with the last setup');
+(function () {
+  if (window.LGMain.getState() !== 'menu') LG.eventBus.emit('quitRequested');
+  ['how-overlay', 'settings-overlay', 'about-overlay', 'profile-overlay', 'challenges-overlay'].forEach(function (id) {
+    if (vis(id)) LG.eventBus.emit(id.replace('-overlay', '') + 'BackRequested');
+  });
+  check(window.LGMain.getState() === 'menu' && vis('menu-overlay'), 'on the main menu for the PLAY NOW probe', window.LGMain.getState());
+  check(!!elements['btn-quick-play'], 'the main menu has a PLAY NOW button');
+
+  var raw = localStorage.getItem('blockout.lastsetup.v1');
+  var saved = null;
+  try { saved = JSON.parse(raw); } catch (e) { saved = null; }
+  check(!!saved && typeof saved.star === 'string', 'starting a match saves the last setup', raw);
+  check(/·/.test(elements['qp-sub'].textContent || ''), 'PLAY NOW shows the setup it will use', elements['qp-sub'].textContent);
+
+  // walk away from the last setup in memory, then PLAY NOW must restore it
+  var before = window.LGMain.getSelections();
+  if (LG.Modes) LG.Modes.select('tournament');
+  var err = null;
+  try { elements['btn-quick-play'].fire('click'); } catch (e) { err = e; }
+  check(!err, 'PLAY NOW runs clean', err && (err.stack || err.message));
+  var mq = window.LGMain.getMatch();
+  check(window.LGMain.getState() === 'match' && !!mq, 'PLAY NOW starts a match straight from the menu', window.LGMain.getState());
+  check(LG.Modes.id() === 'quick_match' && mq && mq.opts.mode === 'quick_match', 'PLAY NOW is always a quick match', mq && mq.opts.mode);
+  check(!!mq && mq.opts.goldenGoal === false, 'a quick match never plays golden goal');
+  check(!!mq && mq.opts.playerId === saved.star, 'PLAY NOW uses the last star', mq && mq.opts.playerId);
+  var hk = mq && mq.opts.outfitColor ? mq.opts.outfitColor.id : null;
+  check(hk === saved.kit, 'PLAY NOW uses the last kit', hk + ' vs ' + saved.kit);
+  check(!!mq && mq.opts.difficulty === before.difficulty, 'PLAY NOW keeps the saved difficulty', mq && mq.opts.difficulty);
+  ['menu-overlay', 'mode-overlay', 'diff-overlay', 'select-overlay', 'style-overlay', 'court-overlay', 'setup-overlay'].forEach(function (id) {
+    if (vis(id)) check(false, 'no setup screen is left open after PLAY NOW: ' + id);
+  });
+
+  // a second tap while a match runs does nothing
+  var same = window.LGMain.getMatch();
+  elements['btn-quick-play'].fire('click');
+  check(window.LGMain.getMatch() === same, 'PLAY NOW is ignored outside the main menu');
+
+  // Golden Goal HUD: the clock reads GG and glows
+  LG.eventBus.emit('goldenGoal', { score: [0, 0], max: 90 });
+  check(elements['clock'].textContent === 'GG' && elements['clock'].classList.contains('golden'),
+    'golden goal turns the clock into GG', elements['clock'].textContent);
+  LG.eventBus.emit('matchStart', { match: same });
+  check(!elements['clock'].classList.contains('golden'), 'a new match clears the golden clock');
+
+  // a locked star in a stale save falls back safely
+  localStorage.setItem('blockout.lastsetup.v1', JSON.stringify({ star: 'nobody', kit: 'nope', away: null }));
+  LG.eventBus.emit('quitRequested');
+  var err2 = null;
+  try { elements['btn-quick-play'].fire('click'); } catch (e) { err2 = e; }
+  var mq2 = window.LGMain.getMatch();
+  check(!err2 && window.LGMain.getState() === 'match' && !!mq2 && LG.Progression.isUnlocked(mq2.opts.playerId),
+    'a bad saved setup still starts with an unlocked star', (err2 && err2.message) || (mq2 && mq2.opts.playerId));
+  check(!!mq2 && mq2.opts.outfitColor === null, 'an unknown saved kit falls back to REGULAR');
+  LG.eventBus.emit('quitRequested');
+})();
+
+section('P10b. graphics quality — LOW / MEDIUM / HIGH / AUTO');
+(function () {
+  var S = LG.Settings;
+  check(S.quality() === 'auto', 'graphics quality defaults to AUTO', S.quality());
+  check(S.qualityLevel(true) === 'medium' && S.qualityLevel(false) === 'high', 'AUTO is MEDIUM on phones, HIGH on desktop');
+  ['gfx-auto', 'gfx-low', 'gfx-medium', 'gfx-high'].forEach(function (id) {
+    check(!!elements[id], 'settings has a ' + id + ' button');
+  });
+  elements['gfx-low'].fire('click');
+  check(S.quality() === 'low', 'LOW is stored', S.quality());
+  var sh = LG.Lighting.shadowState();
+  check(!!sh && sh.on === false, 'LOW turns the sun shadows off', JSON.stringify(sh));
+  check(document.body.dataset.quality === 'low', 'the body carries the active level', document.body.dataset.quality);
+  check(elements['gfx-low'].classList.contains('selected') && !elements['gfx-high'].classList.contains('selected'),
+    'the LOW button shows as selected');
+  var raw = localStorage.getItem('blockout.settings.v1');
+  check(!!raw && raw.indexOf('"quality":"low"') >= 0, 'graphics quality persists to localStorage', raw);
+  var vp = window.LGMain.getViewport ? window.LGMain.getViewport() : null;
+  elements['gfx-high'].fire('click');
+  sh = LG.Lighting.shadowState();
+  check(!!sh && sh.on === true && sh.size === 2048, 'HIGH brings back 2048 shadows', JSON.stringify(sh));
+  elements['gfx-medium'].fire('click');
+  sh = LG.Lighting.shadowState();
+  check(!!sh && sh.on === true && sh.size === 1024, 'MEDIUM uses 1024 shadows', JSON.stringify(sh));
+  check(S.setQuality('ultra') === 'medium', 'an unknown level is refused');
+  elements['gfx-auto'].fire('click');
+  check(S.quality() === 'auto' && document.body.dataset.quality === 'medium', 'AUTO resolves to MEDIUM on this phone', document.body.dataset.quality);
+  check(/MEDIUM/.test(elements['gfx-note'].textContent || ''), 'the note says what AUTO picked', elements['gfx-note'].textContent);
 })();
 
 console.log('\n' + (FAIL === 0 ? 'BOOT + MENU FLOW PASSED' : 'BOOT + MENU FLOW FAILED (' + FAIL + ')'));

@@ -64,6 +64,7 @@ LG.Player = function (def, team, idx) {
   this.stun = 0;
   this.stomp = 0;           // small jump effect on tackle hit
   this.kickAnim = 0;        // 1 -> 0 strike pose timer (set whenever we kick)
+  this.tackleAnim = 0;      // 1 -> 0 tackle lunge timer (Phase 10: GLB Tackle clip)
   this.immovable = false;   // WALL ability
 
   this.isHuman = false;
@@ -115,6 +116,7 @@ LG.Player.prototype.update = function (dt) {
   this.stun = Math.max(0, this.stun - dt);
   this.stomp = Math.max(0, this.stomp - dt);
   this.kickAnim = Math.max(0, this.kickAnim - dt * 5);
+  this.tackleAnim = Math.max(0, this.tackleAnim - dt * 2.2);
 
   // sprint / stamina
   var P = LG.Config.physics;

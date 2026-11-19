@@ -137,7 +137,13 @@ var server = http.createServer(function (req, res) {
 });
 
 var CHROME = [
+  process.env.CHROME || '',
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
 ].filter(function (p) { return fs.existsSync(p); })[0];
@@ -247,6 +253,8 @@ async function attempt(n, maxTries, url) {
     '--remote-debugging-port=' + port,
     url,
   ];
+  // Chrome refuses to start as root (Linux containers / CI) without this
+  if (process.getuid && process.getuid() === 0) cmd.splice(1, 0, '--no-sandbox');
 
   console.log('[shot] try ' + n + '/' + maxTries + ' ' + url);
   var logFile = OUT + '.log';

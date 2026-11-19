@@ -134,12 +134,16 @@
           <div class="street-tag">STREET FOOTBALL</div>
         </div>
         <div class="menu-nav menu-rise">
+          <button id="btn-quick-play" class="big-btn menu-card menu-quick" type="button" aria-describedby="qp-sub">
+            <span class="qp-label">&#9654; PLAY NOW</span>
+            <span class="qp-sub" id="qp-sub">BLAZE · REGULAR KIT</span>
+          </button>
           <button id="btn-challenges" class="big-btn gold menu-card" type="button">CHALLENGES</button>
           <button id="btn-settings" class="big-btn secondary menu-card" type="button">SETTINGS</button>
           <button id="btn-how" class="big-btn gold menu-card" type="button">HOW TO PLAY</button>
           <button id="btn-about" class="big-btn gold menu-card" type="button">ABOUT</button>
         </div>
-        <div class="menu-version" id="menu-version">v1.0.0</div>
+        <div class="menu-version" id="menu-version">v1.1.0</div>
       </div>
     </div>
   </div>
@@ -448,6 +452,15 @@
               <button class="option-btn" id="settings-landscape" type="button">LANDSCAPE</button>
             </span>
           </div>
+          <div class="help-row"><span class="help-key">GFX</span>
+            <span class="option-row" role="group" aria-label="Graphics quality">
+              <button class="option-btn" id="gfx-auto" type="button">AUTO</button>
+              <button class="option-btn" id="gfx-low" type="button">LOW</button>
+              <button class="option-btn" id="gfx-medium" type="button">MED</button>
+              <button class="option-btn" id="gfx-high" type="button">HIGH</button>
+            </span>
+          </div>
+          <div class="help-row"><span class="help-desc">Low turns off shadows and renders at a lower resolution; Medium uses lighter shadows. Pick Low if a phone runs hot or choppy. <span id="gfx-note"></span></span></div>
         </div>
         <div class="help-section" data-settings="accessibility">
           <div class="help-section-title">ACCESSIBILITY</div>
@@ -483,13 +496,15 @@
         <div class="help-section" data-about="about">
           <div class="help-section-title">ABOUT</div>
           <div class="help-row"><span class="help-key">GAME</span><span class="help-desc">BLACKOUT is a 3V3 street football game with goalkeepers — quick matches, focused challenges and a four-team Street Cup.</span></div>
-          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.0.0</b></span></div>
+          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.1.0</b></span></div>
           <div class="help-row"><span class="help-key">RUN</span><span class="help-desc">Plays fully offline after the first load. No account, no server, no purchases.</span></div>
         </div>
         <div class="help-section" data-about="credits">
           <div class="help-section-title">CREDITS</div>
           <div class="help-row"><span class="help-key">3D</span><span class="help-desc">Three.js (MIT License) by the three.js authors</span></div>
-          <div class="help-row"><span class="help-key">AUDIO</span><span class="help-desc">Procedural Web Audio — no samples or external music packs</span></div>
+          <div class="help-row"><span class="help-key">MODEL</span><span class="help-desc">"Soap Soccer Player" by luccacatalan (Sketchfab), licensed CC BY 4.0 — base mesh for every player</span></div>
+          <div class="help-row"><span class="help-key">SFX</span><span class="help-desc">Procedural Web Audio — every sound effect and the crowd are generated in code</span></div>
+          <div class="help-row"><span class="help-key">MUSIC</span><span class="help-desc">Menu tracks created with Google generative AI (marked by embedded Content Credentials)</span></div>
           <div class="help-row"><span class="help-key">ART</span><span class="help-desc">Court art, murals and UI treatment created for this project</span></div>
           <div class="help-row"><span class="help-key">CODE</span><span class="help-desc">Gameplay, AI, progression and UI written for BLACKOUT</span></div>
         </div>
@@ -594,7 +609,7 @@
     if (window.THREE && THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 
     // Single early version stamp so a failed boot still shows a real number.
-    window.BLOCKOUT_VERSION = '1.0.0';
+    window.BLOCKOUT_VERSION = '1.1.0';
     window.addEventListener('error', function (e) {
       try {
         var box = document.getElementById('loading-error');

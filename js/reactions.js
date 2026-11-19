@@ -144,6 +144,15 @@ LG.Reactions = (function () {
     _carrierTeam = -1;
   }
 
+  // Phase 10: while the GLB body plays its authored Tackle clip, that clip
+  // owns the body exactly like the kick does. Procedural / rig bodies have
+  // no tackle clip, so their reactions run as before.
+  function clipOwns(p) {
+    if (!(p.tackleAnim > 0)) return false;
+    var a = p.model && p.model.anim;
+    return !!(a && typeof a.has === 'function' && a.has('tackle'));
+  }
+
   // ---- starting a reaction --------------------------------------
 
   function start(p, kind, opts) {
@@ -151,6 +160,7 @@ LG.Reactions = (function () {
       var K = KINDS[kind];
       if (!K || !p || !p.model) return false;
       if (p.kickAnim > 0) return false;              // the kick owns the body
+      if (clipOwns(p)) return false;                 // so does the authored tackle
       opts = opts || null;
       var rx = p._rx;
       if (rx && rx.kind !== 'release') {
@@ -545,7 +555,7 @@ LG.Reactions = (function () {
         var rx = p._rx;
         // a kick owns the body outright: hand back instantly instead of
         // letting any pose (or its release) fight the kick clip
-        if (p.kickAnim > 0) {
+        if (p.kickAnim > 0 || clipOwns(p)) {
           applyRest(p, rx.rest);
           p._rx = null;
           continue;

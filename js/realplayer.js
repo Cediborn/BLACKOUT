@@ -742,10 +742,16 @@ LG.RealPlayer = (function () {
   // [t0, t0+span] (a 2s strike) and then trail off for two minutes of
   // settle. Keep the strike, drop the trail, and start at the action.
   function buildKickClip() {
+    return buildAuthoredClip(/kick|shoot|strike/i, 'kick');
+  }
+
+  // Phase 10: any one-shot authored clip from the asset (Kick, Tackle, ...),
+  // trimmed to its dense key range the same way the kick always was.
+  function buildAuthoredClip(re, outName) {
     if (!src || !src.clips || !src.clips.length) return null;
     var clip = null, i;
     for (i = 0; i < src.clips.length && !clip; i++) {
-      if (/kick|shoot|strike/i.test(src.clips[i].name)) clip = src.clips[i];
+      if (re.test(src.clips[i].name)) clip = src.clips[i];
     }
     if (!clip || !clip.tracks || !clip.tracks.length) return null;
     var all = [];
@@ -784,13 +790,14 @@ LG.RealPlayer = (function () {
       tracks.push(new t.constructor(t.name, times, vals));
     }
     if (!tracks.length) return null;
-    return { clip: new THREE.AnimationClip('kick', span, tracks), span: span };
+    return { clip: new THREE.AnimationClip(outName, span, tracks), span: span };
   }
 
   // ---- kick contact: probe the authored clip and find the frame where
   // the boot is furthest forward (model forward = +z) ----
   var KICK_LEN = 0.8;       // gameplay window the authored strike runs in
   var KICK_LEAD = 0.12;    // wind-up shown before the strike, in seconds
+  var TACKLE_LEN = 0.45;   // Phase 10: gameplay window the authored 0.3s lunge runs in
 
   function snapshotSkeleton(scene) {
     var snap = [];
@@ -889,7 +896,7 @@ LG.RealPlayer = (function () {
         ' bake=0.0(cached) kick=0.0(cached) bind=' + (th - tb1).toFixed(1) +
         ' k=' + k.toFixed(3));
       return {
-        tgt: tgt, clips: hit.clips, kick: hit.kick, restFootY: restFootY,
+        tgt: tgt, clips: hit.clips, kick: hit.kick, tackle: hit.tackle, restFootY: restFootY,
         bias: hit.bias, bobName: hit.bobName, scaledBy: k,
         clipNames: hit.clipNames
       };
@@ -942,21 +949,25 @@ LG.RealPlayer = (function () {
       var ts = kick.span / KICK_LEN;
       kick.start = Math.max(0, kick.strike - KICK_LEAD * ts);
     }
+    var tackle = null;
+    try { tackle = buildAuthoredClip(/tackle/i, 'tackle'); } catch (e) { tackle = null; }
+    if (!tackle) warn('[GLB] no authored tackle clip found in the asset');
     var tb3 = nowMs();
     log('[GLB] bank ms: resolve=' + (tb1 - tb0).toFixed(1) +
       ' bake=' + (tb2 - tb1).toFixed(1) + ' kick=' + (tb3 - tb2).toFixed(1) +
       ' k=' + (model.anchor && model.anchor.scale.x ? model.anchor.scale.x.toFixed(3) : '?'));
 
     var bobName = bob ? bob.name : null;
+    var extra = (kick ? ['kick'] : []).concat(tackle ? ['tackle'] : []);
     bankCache[cacheKey] = {
-      clips: clips, kick: kick, bias: bias, bobName: bobName,
-      clipNames: names.concat(kick ? ['kick'] : [])
+      clips: clips, kick: kick, tackle: tackle, bias: bias, bobName: bobName,
+      clipNames: names.concat(extra)
     };
 
     return {
-      tgt: tgt, clips: clips, kick: kick, restFootY: restFootY,
+      tgt: tgt, clips: clips, kick: kick, tackle: tackle, restFootY: restFootY,
       bias: bias, bobName: bobName, scaledBy: k,
-      clipNames: names.concat(kick ? ['kick'] : [])
+      clipNames: names.concat(extra)
     };
   }
 
@@ -987,6 +998,14 @@ LG.RealPlayer = (function () {
       kick.setEffectiveWeight(0);
       actions.kick = kick;
     }
+    var tackleA = null;
+    if (bank.tackle) {
+      tackleA = mixer.clipAction(bank.tackle.clip);
+      tackleA.enabled = false;
+      tackleA.setEffectiveWeight(0);
+      actions.tackle = tackleA;
+    }
+    var tackleT = 0, wasTackle = false;
 
     var cur = null, kickT = 0, wasKick = false, last = 0, fails = 0;
     var stopT = 0, peak = 0, since = 99, lastSpd = 0, lastError = '';
@@ -1005,6 +1024,8 @@ LG.RealPlayer = (function () {
 
     function fadeFor(from, to) {
       if (to === 'kick' || from === 'kick') return 0.10;
+      if (to === 'tackle') return 0.06;          // the lunge must read at once
+      if (from === 'tackle') return 0.22;        // rise out of the slide, not a snap
       if (to === 'stop' || from === 'stop') return 0.14;
       return 0.16;
     }
@@ -1030,7 +1051,7 @@ LG.RealPlayer = (function () {
       cur = next;
       a.enabled = true;
       a.reset();
-      if (next === 'kick' || next === 'stop') {
+      if (next === 'kick' || next === 'stop' || next === 'tackle') {
         a.setLoop(THREE.LoopOnce, 1);
         a.clampWhenFinished = true;
       } else {
@@ -1085,6 +1106,8 @@ LG.RealPlayer = (function () {
         var a = actions[nm];
         if (nm === 'kick') {
           a.setEffectiveTimeScale(bank.kick ? bank.kick.span / KICK_LEN : 1);
+        } else if (nm === 'tackle') {
+          a.setEffectiveTimeScale(bank.tackle ? bank.tackle.span / TACKLE_LEN : 1);
         } else if (nm === 'stop') {
           a.setEffectiveTimeScale(1);            // plays its 0.62s in 0.62s
         } else {
@@ -1107,6 +1130,12 @@ LG.RealPlayer = (function () {
       wasKick = kicking;
       if (kickT > 0) { kickT -= rdt; if (kickT < 0) kickT = 0; }
 
+      // Phase 10: tackle window — the authored lunge plays once per attempt
+      var tackling = p.tackleAnim > 0;
+      if (tackling && !wasTackle && tackleA) tackleT = TACKLE_LEN;
+      wasTackle = tackling;
+      if (tackleT > 0) { tackleT -= rdt; if (tackleT < 0) tackleT = 0; }
+
       // deceleration bookkeeping: a one-shot stop when a sprint/run
       // bleeds off, cancelled if the player is moving again
       if (spd01 >= 0.32) { peak = spd01; if (spd01 > 0.30) stopT = 0; }
@@ -1115,6 +1144,7 @@ LG.RealPlayer = (function () {
 
       var want;
       if (kickT > 0 && kick) want = 'kick';
+      else if (tackleT > 0 && tackleA) want = 'tackle';
       else if (stopT > 0 && actions.stop) want = 'stop';
       else if (spd01 < 0.14) want = 'idle';
       // hysteresis on the jog/run boundary so a hovering speed cannot
@@ -1125,13 +1155,13 @@ LG.RealPlayer = (function () {
 
       since += rdt;
       if (want !== cur) {
-        var urgent = (want === 'kick' || want === 'stop' || cur === 'kick');
+        var urgent = (want === 'kick' || want === 'stop' || want === 'tackle' || cur === 'kick' || cur === 'tackle');
         if (urgent || since >= MIN_DWELL) transition(want);
       }
 
       setTimeScales(sp2, cyclesPerSec(sp2));
       mixer.update(rdt);
-      groundLock(rdt, kickT > 0);
+      groundLock(rdt, kickT > 0 || tackleT > 0);
       return true;
     }
 
@@ -1173,7 +1203,11 @@ LG.RealPlayer = (function () {
           kickSpan: bank.kick ? Math.round(bank.kick.span * 100) / 100 : 0,
           kickStrike: bank.kick ? Math.round((bank.kick.strike || 0) * 100) / 100 : 0,
           kickStart: bank.kick ? Math.round((bank.kick.start || 0) * 100) / 100 : 0,
-          kickLen: KICK_LEN
+          kickLen: KICK_LEN,
+          tackle: Math.round(tackleT * 100) / 100,
+          tackleClip: bank.tackle ? bank.tackle.clip.name : null,
+          tackleSpan: bank.tackle ? Math.round(bank.tackle.span * 100) / 100 : 0,
+          tackleLen: TACKLE_LEN
         };
       },
       // pin a pose at an exact clip time — frame-rate independent, for
@@ -1187,7 +1221,7 @@ LG.RealPlayer = (function () {
           Object.keys(actions).forEach(function (nm) {
             if (nm !== name && actions[nm].enabled) actions[nm].stop();
           });
-          var once = (name === 'kick' || name === 'stop');
+          var once = (name === 'kick' || name === 'stop' || name === 'tackle');
           a.enabled = true;
           a.reset();
           a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
@@ -1198,13 +1232,16 @@ LG.RealPlayer = (function () {
           a.time = Math.min(Math.max(0, t || 0), Math.max(0, dur - 1e-3));
           mixer.update(0);
           cur = name;
-          if (name === 'kick') { kickT = KICK_LEN; stopT = 0; }
-          else { kickT = 0; stopT = (name === 'stop') ? STOP_DUR : 0; peak = 0; }
-          groundLock(0, name === 'kick');
+          if (name === 'kick') { kickT = KICK_LEN; stopT = 0; tackleT = 0; }
+          else if (name === 'tackle') { tackleT = TACKLE_LEN; kickT = 0; stopT = 0; }
+          else { kickT = 0; tackleT = 0; stopT = (name === 'stop') ? STOP_DUR : 0; peak = 0; }
+          groundLock(0, name === 'kick' || name === 'tackle');
           last = nowMs();
           return true;
         } catch (e) { return onFail(e); }
       },
+      // Phase 10: lets other layers ask whether a clip exists on this body
+      has: function (name) { return !!actions[name]; },
       step: function (rdt, p) {
         try { return advance(rdt, p); } catch (e) { return onFail(e); }
       },

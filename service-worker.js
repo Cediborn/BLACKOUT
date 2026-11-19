@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v16';   // Phase 9.1 — character identity + streetwear
+var CACHE_NAME = 'blackout-v17';   // Phase 10 — golden goal, PLAY NOW, graphics quality, tackle clip
 var ASSETS = [
   './',
   './index.html',

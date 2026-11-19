@@ -52,6 +52,8 @@ LG.HUD = (function () {
     document.getElementById('pause-btn').addEventListener('click', function () { LG.Audio.sfx.pause(); LG.eventBus.emit('pauseRequested'); });
     document.getElementById('btn-back').addEventListener('click', function () { LG.Audio.sfx.back(); LG.eventBus.emit('menuBackRequested'); });
     document.getElementById('btn-play').addEventListener('click', function () { LG.Audio.unlock(); LG.Audio.sfx.click(); LG.eventBus.emit('playRequested'); });
+    var quickPlay = document.getElementById('btn-quick-play');
+    if (quickPlay) quickPlay.addEventListener('click', function () { LG.Audio.unlock(); LG.Audio.sfx.click(); LG.eventBus.emit('quickPlayRequested'); });
     document.getElementById('btn-how').addEventListener('click', function () { LG.Audio.sfx.click(); LG.eventBus.emit('howRequested'); });
     document.getElementById('btn-how-back').addEventListener('click', function () { LG.Audio.sfx.back(); LG.eventBus.emit('howBackRequested'); });
     document.getElementById('btn-settings').addEventListener('click', function () { LG.Audio.unlock(); LG.Audio.sfx.click(); LG.eventBus.emit('settingsRequested'); });
@@ -122,6 +124,14 @@ LG.HUD = (function () {
   function setClock(t) {
     clockEl.textContent = LG.Util.fmtTime(Math.max(0, t));
     clockEl.classList.toggle('low', t <= 10.5 && t > 0);
+  }
+
+  // Golden Goal: the clock reads GG and glows until the match ends
+  function setGolden(on) {
+    if (!clockEl) return;
+    clockEl.classList.toggle('golden', !!on);
+    clockEl.classList.remove('low');
+    if (on) clockEl.textContent = 'GG';
   }
 
   function clearTags() {
@@ -242,7 +252,7 @@ LG.HUD = (function () {
     setScore: setScore, setClock: setClock,
     reset: reset, clearTags: clearTags,
     updateSpecial: updateSpecial, showSpecialName: showSpecialName,
-    banner: banner, flash: flash, toast: toast, aim: aim,
+    banner: banner, flash: flash, toast: toast, aim: aim, setGolden: setGolden,
     updateCoins: updateCoins, setTeamNames: setTeamNames,
     setControlMode: setControlMode, setModeChip: setModeChip,
   };

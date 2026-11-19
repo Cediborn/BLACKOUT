@@ -373,6 +373,8 @@ LG.MatchManager.prototype = {
     this.stateT = LG.Config.match.kickoffDelay;
     this.clock = LG.Config.match.duration;
     this.score = [0, 0];
+    this.goldenGoal = false;
+    this.goldenT = 0;
     this.placeKickoff();
     this.bus.emit('matchStart', { match: this });
     this.bus.emit('state', { state: 'KICKOFF' });
@@ -476,6 +478,8 @@ LG.MatchManager.prototype = {
         if (LG.Celebration) LG.Celebration.update(this, dt);
         if (this.stateT <= 0) {
           if (LG.Celebration) { LG.Celebration.stop(); LG.Celebration.clearPoses(this); }
+          // Golden Goal: the goal that broke the tie is the winner — no restart
+          if (this.goldenGoal) { this.endMatch(); return; }
           this.state = 'KICKOFF';
           this.stateT = LG.Config.match.kickoffDelay;
           this.placeKickoff();
@@ -483,9 +487,15 @@ LG.MatchManager.prototype = {
         }
         break;
       case 'PLAY':
-        this.tickTimer(dt);
+        if (this.goldenGoal) this.tickGoldenGoal(dt);
+        else this.tickTimer(dt);
         this.updatePlayers(dt);
-        if (this.clock <= 0) { this.endMatch(); return; }
+        if (!this.goldenGoal && this.clock <= 0) {
+          // a tie at 0:00 in a mode that allows it plays on: next goal wins
+          if (this.opts.goldenGoal && this.score[0] === this.score[1]) this.startGoldenGoal();
+          else { this.endMatch(); return; }
+        }
+        if (this.goldenGoal && this.goldenT >= this.goldenMax) { this.endMatch(); return; }
         this.resolvePossession();
         this._playTime += dt;
         // possession clock: only real controlled time accrues (no loose-ball pad)
@@ -537,6 +547,27 @@ LG.MatchManager.prototype = {
       LG.Audio.sfx.whistle(0.1);
     }
     this.bus.emit('clock', { t: this.clock });
+  },
+
+  // ------------------------------------------------------------
+  // GOLDEN GOAL — sudden death after a tie at full time (Phase 10).
+  // Enabled per match by opts.goldenGoal (the mode's rules decide).
+  // The clock stops at 0:00, play simply carries on, and the next goal
+  // ends the match. goldenMax caps the period so a match can never run
+  // forever; if it expires the result stays a draw.
+  startGoldenGoal: function () {
+    this.goldenGoal = true;
+    this.goldenT = 0;
+    var M = LG.Config.match;
+    this.goldenMax = (M.goldenGoalMax != null) ? M.goldenGoalMax : 90;
+    this.clock = 0;
+    LG.Audio.sfx.whistle(0.55);
+    this.bus.emit('goldenGoal', { score: [this.score[0], this.score[1]], max: this.goldenMax });
+  },
+
+  tickGoldenGoal: function (dt) {
+    this.goldenT += dt;
+    this.bus.emit('goldenClock', { t: this.goldenT, left: Math.max(0, this.goldenMax - this.goldenT) });
   },
 
   // ------------------------------------------------------------
@@ -1004,6 +1035,7 @@ LG.MatchManager.prototype = {
   tryTackle: function (p, opts) {
     if (p.tackleCd > 0) return;
     p.tackleCd = 0.5;
+    p.tackleAnim = 1;   // presentation only: the body lunges (GLB Tackle clip)
     // Difficulty scales only how well an AI times its challenge. The human
     // always attacks the ball at full ability, and the angle rules below are
     // identical in both directions — no asymmetric tackling anywhere.
@@ -1619,6 +1651,7 @@ LG.MatchManager.prototype = {
       ts: Date.now(),
       stats: snap,
       mode: (LG.Modes && typeof LG.Modes.id === 'function') ? LG.Modes.id() : 'quick_match',
+      goldenGoal: !!this.goldenGoal,
     };
     if (LG.Progression && LG.Progression.finalizeMatch) {
       result = LG.Progression.finalizeMatch(result) || result;

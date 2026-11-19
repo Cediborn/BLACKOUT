@@ -6,6 +6,18 @@ abilities: nothing here grants gameplay stats.
 | Asset | Path | Used by | Licence | Author / Source |
 | --- | --- | --- | --- | --- |
 | Soccer player rig | `3d/soap_soccer_player.glb` | `js/realplayer.js`, `js/models.js` | CC-BY-4.0 | luccacatalan (Sketchfab) |
+| Menu music (5 tracks) | `audio/menu/*.mp3` | `js/menu-music.js` | See note below | Google generative AI |
+
+## Menu music
+
+- **Files:** `Concrete Turf`, `Feel The Light`, `Inside My Head`, `Le Titane`,
+  `Otra Vez` (`audio/menu/*.mp3`, ~12 min total).
+- **Source:** every file carries valid C2PA Content Credentials signed by
+  Google ("Created by Google Generative AI", SynthID watermark applied).
+- **Terms:** the files do not record which Google product made them or its
+  terms. Record the tool and its usage terms here before any public or
+  commercial release.
+- Credited in-game under ABOUT → CREDITS → MUSIC.
 
 ## Player base model
 
@@ -13,7 +25,7 @@ abilities: nothing here grants gameplay stats.
 - **Licence:** Creative Commons Attribution 4.0 International (CC-BY-4.0)
 - **Author:** luccacatalan (https://sketchfab.com/luccacatalan)
 - **Source:** https://sketchfab.com/3d-models/soap-soccer-player-5ae4bf9d6a324cfda79ce1298ea2d333
-- **Attribution:** Required. Retained here and in the in-game credits path.
+- **Attribution:** Required. Retained here and in-game under ABOUT → CREDITS → MODEL.
 - **Usage:** Base mesh for all eight roster characters. Skinned (7 meshes /
   6152 tris / 48 bones), tinted per-character by `js/cosmetics.js` and
   `js/config.js` palettes. Cosmetic outfits, faces, hairstyles and accessories

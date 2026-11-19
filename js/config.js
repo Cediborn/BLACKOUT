@@ -4,7 +4,7 @@
 var LG = window.LG = window.LG || {};
 
 LG.Config = {
-  version: '1.0.0',
+  version: '1.1.0',
 
   court: {
     width: 26,        // x extent (half = 13)
@@ -20,6 +20,7 @@ LG.Config = {
     duration: 120,          // seconds per match (2:00)
     kickoffDelay: 1.4,      // freeze before kickoff
     goalDelay: 2.6,         // celebration pause after a goal
+    goldenGoalMax: 90,      // longest sudden-death period after a tie (seconds)
     endDelay: 2.2,
     maxGoalsShown: 9,
     swapCooldown: 0.5,
@@ -263,6 +264,21 @@ LG.Config = {
     },
   },
 
+  // ------------------------------------------------------------
+  // GRAPHICS QUALITY (Phase 10) — one profile per level. LG.Settings picks
+  // the level (AUTO = MEDIUM on phones, HIGH on desktop); main.js applies it.
+  //   dprCap     highest device pixel ratio the canvas renders at
+  //   shadows    real-time sun shadows on/off
+  //   shadowMap  sun shadow-map resolution
+  // Future realism features (textures, cloth, extra clips) gate on the
+  // level name too, so phones stay smooth.
+  // ------------------------------------------------------------
+  quality: {
+    low:    { label: 'LOW',    dprCap: 1,    shadows: false, shadowMap: 1024 },
+    medium: { label: 'MEDIUM', dprCap: 2,    shadows: true,  shadowMap: 1024 },
+    high:   { label: 'HIGH',   dprCap: 2,    shadows: true,  shadowMap: 2048 },
+  },
+
   touch: {
     shootThreshold: 0.55,   // hold to charge, shoot when released past this
     // virtual stick feel: full tilt needs a short, comfortable finger travel
@@ -330,7 +346,7 @@ LG.Roster = [
     id: 'blaze', name: 'BLAZE', role: 'WINGER', emoji: '🔥',
     stats: { speed: 10, shoot: 5, pass: 6, dribble: 8, defense: 4, stamina: 7 },
     ability: 'BURST',
-    team: ['cannon', 'eddy'],
+    team: ['cannon', 'volt'],
     palette: { skin: 0xc89854, hair: 0xff5a2d, shirt: 0x232a36, trim: 0xffd23f, pants: 0x141821, shoe: 0xff5a2d },
   },
   {
