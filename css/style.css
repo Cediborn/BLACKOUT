@@ -148,6 +148,8 @@ button:focus-visible,
   text-align: center;
 }
 #scoreboard .clock.low { color: var(--hud-red); animation: pulse 0.7s ease infinite; }
+/* Golden Goal: sudden death after a tie at full time */
+#scoreboard .clock.golden { color: #ffc14d; text-shadow: 0 0 12px rgba(255, 193, 77, 0.55); }
 @keyframes pulse { 50% { opacity: 0.45; } }
 #scoreboard .vs { font-size: 12px; color: rgba(230, 217, 180, 0.45); }
 
@@ -1793,6 +1795,30 @@ body.reduced-motion #loading-overlay .street-tag { animation: none; }
   background: linear-gradient(170deg, #fbf9f3, #e4dfd1);
   box-shadow: 0 14px 26px rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.85);
 }
+/* PLAY NOW (Phase 10): one tap into a quick match with the last setup.
+   Spans the whole nav row; cyan so it never reads as a second KICK OFF. */
+#menu-overlay .menu-card.menu-quick {
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 4px;
+  color: #06181b;
+  background: linear-gradient(168deg, #5fe3ef 0%, #14c8db 52%, #0e9fb0 100%);
+  box-shadow:
+    0 0 0 2px rgba(20, 200, 219, 0.35),
+    0 0 26px rgba(20, 200, 219, 0.32),
+    0 14px 26px rgba(0, 0, 0, 0.45),
+    inset 0 2px 0 rgba(230, 252, 255, 0.5);
+}
+#menu-overlay .menu-quick .qp-label { line-height: 1; }
+#menu-overlay .menu-quick .qp-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(9px, 0.76vw, 13px);
+  letter-spacing: 0.22em;
+  color: rgba(6, 24, 27, 0.66);
+}
+
 #menu-overlay .menu-version {
   margin-top: 0;
   align-self: flex-start;

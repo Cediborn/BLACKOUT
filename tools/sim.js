@@ -2163,6 +2163,136 @@ section('19. switching — shared possession read + facing tie-break');
 })();
 
 // ============================================================
+// PHASE 10 — roster integrity: every teammate id names a real character,
+// so no side can ever field the same star twice (Blaze once listed 'eddy',
+// which silently resolved to Blaze himself).
+section('20. roster integrity — teammate ids resolve, no duplicate stars');
+(function () {
+  var ids = LG.Roster.map(function (r) { return r.id; });
+  var dangling = [];
+  var dupes = [];
+  LG.Roster.forEach(function (r) {
+    (r.team || []).forEach(function (t) { if (ids.indexOf(t) < 0) dangling.push(r.id + '->' + t); });
+    var m = newMatch(r.id);
+    var homeIds = m.home.filter(function (p) { return !p.isGoalkeeper; }).map(function (p) { return p.id; });
+    if (homeIds.some(function (x, i) { return homeIds.indexOf(x) !== i; })) dupes.push(r.id + ':' + homeIds.join('/'));
+  });
+  assert(dangling.length === 0, 'every roster teammate id is a real character', dangling.join(', '));
+  assert(dupes.length === 0, 'no home side ever fields the same star twice', dupes.join(' | '));
+})();
+
+// ============================================================
+// PHASE 10 — GOLDEN GOAL: a tie at 0:00 plays on when the mode allows it;
+// the next goal ends the match; off by default; capped so it never runs forever.
+section('21. golden goal — tie at full time, next goal wins');
+(function () {
+  var KNOWN = { IDLE: 1, KICKOFF: 1, PLAY: 1, GOAL: 1, END: 1 };
+  function toPlay(m, t) {
+    for (var i = 0; i < 300 && m.state !== 'PLAY'; i++) step(m, 1 / 60, t);
+  }
+  function scoreInto(m, t, homeScores) {
+    m.all.forEach(function (p) { p.hasBall = false; });
+    m.ball.owner = null;
+    var half = LG.Config.court.length / 2;
+    m.ball.reset(0, homeScores ? -half - 0.3 : half + 0.3);
+    step(m, 1 / 60, t);
+  }
+  var events = [];
+  var onGG = function (e) { events.push(e); };
+  LG.eventBus.on('goldenGoal', onGG);
+
+  // 1) default (quick match): a 0-0 at the whistle is a draw, as before
+  var m0 = newMatch('blaze'), t0 = { t: 0 };
+  m0.start(); toPlay(m0, t0);
+  m0.clock = 0.001; step(m0, 1 / 60, t0);
+  assert(m0.state === 'END' && !m0.goldenGoal, 'without the rule a tie still ends at the whistle', m0.state);
+  assert(events.length === 0, 'no golden goal event without the rule', events.length);
+
+  // 2) rule on, tied at 0:00 -> play continues in sudden death
+  var m = new LG.MatchManager({ playerId: 'blaze', homeName: 'YOU', awayName: 'ROGUE', goldenGoal: true });
+  var t = { t: 0 };
+  m.start(); toPlay(m, t);
+  m.clock = 0.001; step(m, 1 / 60, t);
+  assert(m.state === 'PLAY' && m.goldenGoal === true, 'a tie at 0:00 goes to golden goal, not full time', m.state);
+  assert(events.length === 1, 'goldenGoal fires exactly once', events.length);
+  assert(m.clock === 0, 'the match clock holds at 0:00 in golden goal', m.clock);
+  for (var i = 0; i < 120; i++) step(m, 1 / 60, t);
+  assert(m.state === 'PLAY' && !m._finalized, 'golden goal keeps playing with no goal', m.state);
+  assert(events.length === 1, 'golden goal never re-triggers', events.length);
+
+  // 3) the next goal wins — celebration, then straight to full time (no kickoff)
+  var ends = [];
+  var onEnd = function (r) { ends.push(r); };
+  LG.eventBus.on('matchEnd', onEnd);
+  var seen = {};
+  scoreInto(m, t, true);
+  assert(m.state === 'GOAL' && m.score[0] === 1, 'a golden goal counts', m.state + ' ' + m.score.join('-'));
+  for (i = 0; i < 700 && m.state !== 'END'; i++) { step(m, 1 / 60, t); seen[m.state] = 1; }
+  assert(m.state === 'END' && m._finalized, 'after the golden goal celebration, the match ends', m.state);
+  assert(!seen.KICKOFF, 'there is no restart after a golden goal');
+  assert(ends.length === 1 && ends[0].won === 1, 'the golden goal scorer wins the match', ends.length + ' ' + (ends[0] && ends[0].won));
+  assert(ends[0].goldenGoal === true, 'the result records that it was decided by golden goal');
+  var bad = Object.keys(seen).filter(function (s) { return !KNOWN[s]; });
+  assert(bad.length === 0, 'golden goal adds no new match state', bad.join(','));
+
+  // 4) a non-tie at 0:00 ends normally even with the rule on
+  var m2 = new LG.MatchManager({ playerId: 'blaze', homeName: 'YOU', awayName: 'ROGUE', goldenGoal: true });
+  var t2 = { t: 0 };
+  m2.start(); toPlay(m2, t2);
+  m2.score = [2, 1];
+  m2.clock = 0.001; step(m2, 1 / 60, t2);
+  assert(m2.state === 'END' && !m2.goldenGoal, 'a decided match ends at the whistle even with the rule', m2.state);
+
+  // 5) the cap: a goalless sudden death ends as a draw, never runs forever
+  var m3 = new LG.MatchManager({ playerId: 'blaze', homeName: 'YOU', awayName: 'ROGUE', goldenGoal: true });
+  var t3 = { t: 0 };
+  m3.start(); toPlay(m3, t3);
+  m3.clock = 0.001; step(m3, 1 / 60, t3);
+  m3.goldenT = m3.goldenMax - 0.001;
+  m3.all.forEach(function (p) { p.hasBall = false; });
+  m3.ball.owner = null; m3.ball.reset(0, 0);
+  step(m3, 1 / 60, t3);
+  assert(m3.state === 'END', 'golden goal is capped by goldenGoalMax', m3.state + ' ' + m3.goldenT);
+
+  // 6) mode rules: only the Street Cup turns it on
+  assert(LG.Modes.rules('tournament').goldenGoal === true, 'the Street Cup plays golden goal');
+  assert(LG.Modes.rules('quick_match').goldenGoal === false, 'quick match keeps a plain draw');
+  assert(LG.Modes.rules('challenge_match').goldenGoal === false, 'challenge match keeps a plain draw');
+
+  LG.eventBus.off('goldenGoal', onGG);
+  LG.eventBus.off('matchEnd', onEnd);
+})();
+
+// ============================================================
+// PHASE 10 — tackle animation timer: presentation only, never gameplay.
+section('22. tackle lunge — tackleAnim is set, decays, and changes nothing else');
+(function () {
+  var m = newMatch('stone');
+  var t = { t: 0 };
+  m.start();
+  for (var i = 0; i < 300 && m.state !== 'PLAY'; i++) step(m, 1 / 60, t);
+  var me = m.home.filter(function (p) { return !p.isGoalkeeper; })[0];
+  var carrier = m.away.filter(function (p) { return !p.isGoalkeeper; })[0];
+  m.all.forEach(function (p) { place(p, 40, 40); });
+  place(carrier, 0, -4, 0);
+  place(me, 0, -2.6, Math.PI);
+  giveBall(m, carrier);
+  assert(me.tackleAnim === 0, 'nobody starts a match mid-lunge', me.tackleAnim);
+  me.tackleCd = 0;
+  m.tryTackle(me);
+  assert(me.tackleAnim === 1, 'a tackle attempt starts the lunge timer', me.tackleAnim);
+  var cdAfter = me.tackleCd;
+  m.tryTackle(me);
+  assert(me.tackleCd === cdAfter, 'the lunge never bypasses the tackle cooldown');
+  me.update(0.2);
+  assert(me.tackleAnim > 0 && me.tackleAnim < 1, 'the lunge timer decays with play', me.tackleAnim);
+  me.update(0.4);
+  assert(me.tackleAnim === 0, 'the lunge is over in under half a second', me.tackleAnim);
+  me.update(0);
+  assert(me.tackleAnim === 0, 'a frozen frame never restarts the lunge');
+})();
+
+// ============================================================
 console.log('\n---------------------------------------------');
 console.log(PASS + ' passed, ' + FAIL + ' failed');
 console.log('---------------------------------------------');

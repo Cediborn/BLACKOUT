@@ -197,6 +197,24 @@ LG.Lighting = (function () {
     mode: function () { return mode; },
     // what the environment actually contained when collect() ran
     stats: function () { return { points: stats.points, emissives: stats.emissives, skies: stats.skies }; },
+
+    // Phase 10 graphics quality: sun shadows on/off + shadow-map size.
+    // Toggling castShadow changes the light state, so three rebuilds the
+    // affected programs by itself; a new map size drops the old shadow map
+    // so it is reallocated at the new resolution on the next render.
+    setShadows: function (on, size) {
+      if (!sun) return false;
+      sun.castShadow = !!on;
+      size = size | 0;
+      if (size > 0 && sun.shadow && sun.shadow.mapSize && sun.shadow.mapSize.x !== size) {
+        sun.shadow.mapSize.set(size, size);
+        if (sun.shadow.map && sun.shadow.map.dispose) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+      }
+      return true;
+    },
+    shadowState: function () {
+      return sun ? { on: !!sun.castShadow, size: sun.shadow && sun.shadow.mapSize ? sun.shadow.mapSize.x : 0 } : null;
+    },
   };
 })();
 

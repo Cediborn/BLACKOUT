@@ -23,6 +23,52 @@
   var clock = { t: 0 };
   var isMobile = false;
 
+  // ---------------- last setup (Phase 10: PLAY NOW) ----------------
+  // Difficulty, court and day/night + view already persist in their own
+  // modules; the star and both kits did not. This tiny store remembers them
+  // so PLAY NOW can start a match in one tap, and so the normal flow opens
+  // on the player's last picks. A locked or unknown star falls back to the
+  // default; a missing kit falls back to REGULAR.
+  var LAST_KEY = 'blockout.lastsetup.v1';
+  function colorById(id) {
+    if (!id || !LG.OutfitColors) return null;
+    for (var i = 0; i < LG.OutfitColors.length; i++) if (LG.OutfitColors[i].id === id) return LG.OutfitColors[i];
+    return null;
+  }
+  function saveLastSetup() {
+    try {
+      localStorage.setItem(LAST_KEY, JSON.stringify({
+        star: selectedId,
+        kit: outfitColor ? outfitColor.id : null,
+        away: awayColor ? awayColor.id : null,
+      }));
+    } catch (e) { /* storage blocked: PLAY NOW just uses defaults */ }
+    refreshQuickPlayLabel();
+  }
+  function applyLastSetup() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) { d = null; }
+    if (d && typeof d === 'object') {
+      var known = false;
+      for (var i = 0; i < LG.Roster.length; i++) if (LG.Roster[i].id === d.star) known = true;
+      if (known && LG.Progression && LG.Progression.isUnlocked(d.star)) selectedId = d.star;
+      outfitColor = colorById(d.kit);
+      awayColor = colorById(d.away);
+      if (outfitColor && awayColor && outfitColor.id === awayColor.id) awayColor = null;
+    }
+    refreshQuickPlayLabel();
+  }
+  function refreshQuickPlayLabel() {
+    var el = document.getElementById('qp-sub');
+    if (!el) return;
+    var def = LG.byId(selectedId);
+    var court = (LG.Courts && LG.Courts.get && LG.Courts.selected) ? LG.Courts.get(LG.Courts.selected()) : null;
+    var parts = [def ? def.name : ''];
+    parts.push(outfitColor ? outfitColor.label + ' KIT' : 'REGULAR KIT');
+    if (court && court.name) parts.push(court.name);
+    el.textContent = parts.join(' · ');
+  }
+
   var IS_MOBILE = (function () {
     var t = 'ontouchstart' in window;
     var p = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -76,6 +122,7 @@
     // Day/Night atmosphere lives in LG.Lighting (owns the key lights). The
     // arena environment is untouched by it — only its lighting is rebalanced.
     LG.Lighting.build(scene, renderer);
+    applyQuality();        // Phase 10: resolution cap + shadows from the saved level
     var tArena = performance.now();
     arenaObj = LG.Arena.build(scene);
     // startup profiling: environment build cost (includes the instanced crowd)
@@ -93,6 +140,7 @@
     LG.Input.init();
     LG.HUD.init();
     LG.HUD.bindButtons();
+    applyLastSetup();      // Phase 10: open on the player's last star + kits
     refreshDifficultyUI();
     buildSelectGrid();
 
@@ -272,12 +320,34 @@
   var vpPending = false, vpConfirm = false;
   var vpW = 0, vpH = 0, vpDPR = 0, vpApplies = 0;
 
+  // ---------------- graphics quality (Phase 10) ----------------
+  // The profile caps the render resolution and switches sun shadows; the
+  // viewport pipeline picks the new cap up on its next pass.
+  function qualityProfile() {
+    return (LG.Settings && LG.Settings.qualityProfile) ? LG.Settings.qualityProfile(IS_MOBILE)
+      : { dprCap: 2, shadows: true, shadowMap: 2048 };
+  }
+  function maxDpr() {
+    var c = Number(qualityProfile().dprCap);
+    return isFinite(c) && c > 0 ? c : 2;
+  }
+  function applyQuality() {
+    var q = qualityProfile();
+    if (LG.Lighting && LG.Lighting.setShadows) LG.Lighting.setShadows(q.shadows, q.shadowMap);
+    document.body.dataset.quality = LG.Settings.qualityLevel(IS_MOBILE);
+    scheduleViewportLayout();
+  }
+  function setQuality(q) {
+    LG.Settings.setQuality(q);
+    applyQuality();
+  }
+
   function applyViewportLayout() {
     vpApplies++;
     if (!renderer || !camera) return;
     var w = Math.max(1, Math.round(window.innerWidth || 1));
     var h = Math.max(1, Math.round(window.innerHeight || 1));
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var dpr = Math.min(window.devicePixelRatio || 1, maxDpr());
     var sizeMoved = w !== vpW || h !== vpH;
     var dprMoved = dpr !== vpDPR;
     if (dprMoved) {
@@ -326,6 +396,16 @@
       refreshModeUI();
       showOverlay('menu-overlay', false);
       showOverlay('mode-overlay', true);
+    });
+
+    // PLAY NOW (Phase 10): one tap from the main menu straight into a Quick
+    // Match with the last star, kits, difficulty, court and match setup.
+    bus.on('quickPlayRequested', function () {
+      if (UIState !== 'menu') return;
+      if (LG.Modes) { LG.Modes.select('quick_match'); LG.Modes.clearChallenge(); }
+      selectedMode = 'quick_match';
+      applyLastSetup();
+      startMatch(selectedId);
     });
 
     bus.on('modeBackRequested', function () {
@@ -709,6 +789,13 @@
       LG.HUD.banner('READY', '', 900);
     });
     bus.on('clock', function (e) { LG.HUD.setClock(e.t); });
+    // Golden Goal: tied at 0:00 — sudden death, next goal wins
+    bus.on('goldenGoal', function () {
+      LG.HUD.banner('GOLDEN GOAL', 'team1', 2200);
+      LG.HUD.toast('NEXT GOAL WINS', 2400);
+      if (LG.HUD.setGolden) LG.HUD.setGolden(true);
+    });
+    bus.on('matchStart', function () { if (LG.HUD.setGolden) LG.HUD.setGolden(false); });
 
     bus.on('goal', function (g) {
       var mine = g.team === 0;
@@ -813,6 +900,10 @@
     on('vol-music-0', function () { LG.Settings.setVolMusic(0); refreshSettingsScreen(); });
     on('vol-music-50', function () { LG.Settings.setVolMusic(0.5); refreshSettingsScreen(); });
     on('vol-music-100', function () { LG.Settings.setVolMusic(1); refreshSettingsScreen(); });
+    on('gfx-auto', function () { setQuality('auto'); refreshSettingsScreen(); });
+    on('gfx-low', function () { setQuality('low'); refreshSettingsScreen(); });
+    on('gfx-medium', function () { setQuality('medium'); refreshSettingsScreen(); });
+    on('gfx-high', function () { setQuality('high'); refreshSettingsScreen(); });
     on('rm-on', function () { setReducedMotion(true); refreshSettingsScreen(); });
     on('rm-off', function () { setReducedMotion(false); refreshSettingsScreen(); });
     on('btn-settings-reset', function () { requestSettingsReset(); });
@@ -873,6 +964,13 @@
     markSelected('vol-music-0', mb2 === 0);
     markSelected('vol-music-50', mb2 === 50);
     markSelected('vol-music-100', mb2 === 100);
+    var gq = LG.Settings.quality();
+    markSelected('gfx-auto', gq === 'auto');
+    markSelected('gfx-low', gq === 'low');
+    markSelected('gfx-medium', gq === 'medium');
+    markSelected('gfx-high', gq === 'high');
+    var gn = document.getElementById('gfx-note');
+    if (gn) gn.textContent = gq === 'auto' ? 'AUTO IS USING ' + LG.Settings.qualityLevel(IS_MOBILE).toUpperCase() + ' ON THIS DEVICE' : '';
     markSelected('rm-on', LG.Settings.reducedMotion());
     markSelected('rm-off', !LG.Settings.reducedMotion());
     var rb = document.getElementById('btn-settings-reset');
@@ -1444,6 +1542,7 @@
   function startMatch(playerId) {
     var t0 = nowMs();
     selectedId = playerId;
+    saveLastSetup();
     enterLandscape();
     // consume the selected atmosphere now (also re-collects + re-applies if a
     // court swap added any new lights or emissive signs after boot)
@@ -1486,6 +1585,9 @@
     } else {
       matchOpts.mode = (LG.Modes && LG.Modes.id) ? LG.Modes.id() : 'quick_match';
     }
+    // the mode's rules ride into the match (Phase 10: Golden Goal)
+    var rules = (LG.Modes && LG.Modes.rules) ? LG.Modes.rules() : {};
+    matchOpts.goldenGoal = !!rules.goldenGoal;
 
     // phone screens get one extra size bump, baked into every player as it is
     // built (model + collision body + height move together) — see LG.Config.player
@@ -1550,6 +1652,7 @@
   }
 
   function showOverlay(id, on) {
+    if (id === 'menu-overlay' && on) refreshQuickPlayLabel();
     var el = document.getElementById(id);
     if (!el) return;
     if (on) {
@@ -1940,7 +2043,7 @@
     // re-verified against reality every frame instead of trusting the events.
     var vw = Math.max(1, Math.round(window.innerWidth || 1));
     var vh = Math.max(1, Math.round(window.innerHeight || 1));
-    var vdpr = Math.min(window.devicePixelRatio || 1, 2);
+    var vdpr = Math.min(window.devicePixelRatio || 1, maxDpr());
     if (vw !== vpW || vh !== vpH || vdpr !== vpDPR) scheduleViewportLayout();
     syncMusic();
     updateRotate();

@@ -16,10 +16,12 @@ LG.Settings = (function () {
     volCrowd: 1,          // 0..1 — ambient crowd bed + cheers
     volMusic: 0.7,        // 0..1 — menu music only (match audio untouched)
     reducedMotion: false, // real: body class + camera shake/pulse off
+    quality: 'auto',      // 'auto' | 'low' | 'medium' | 'high' (Phase 10 graphics quality)
   };
 
   var TIME = ['day', 'night'];
   var VIEW = ['portrait', 'landscape'];
+  var QUALITY = ['auto', 'low', 'medium', 'high'];
 
   function num01(n, fallback) {
     n = Number(n);
@@ -39,6 +41,7 @@ LG.Settings = (function () {
         if (p.volCrowd !== undefined) data.volCrowd = num01(p.volCrowd, data.volCrowd);
         if (p.volMusic !== undefined) data.volMusic = num01(p.volMusic, data.volMusic);
         if (p.reducedMotion !== undefined) data.reducedMotion = !!p.reducedMotion;
+        if (QUALITY.indexOf(p.quality) >= 0) data.quality = p.quality;
       }
     } catch (e) { /* ignore */ }
   }
@@ -103,6 +106,26 @@ LG.Settings = (function () {
       return data.reducedMotion;
     },
 
+    // ---- graphics quality (Phase 10) ----
+    // 'auto' resolves per device: phones/tablets get MEDIUM, desktops HIGH.
+    // Every heavier visual added later reads qualityLevel(), never the raw
+    // setting, so 'auto' is handled in exactly one place.
+    quality: function () { return data.quality; },
+    setQuality: function (q) {
+      if (QUALITY.indexOf(q) < 0) return data.quality;
+      data.quality = q; save();
+      return data.quality;
+    },
+    qualityLevel: function (isMobile) {
+      if (data.quality !== 'auto') return data.quality;
+      return isMobile ? 'medium' : 'high';
+    },
+    qualityProfile: function (isMobile) {
+      var lvl = this.qualityLevel(isMobile);
+      var Q = (LG.Config && LG.Config.quality) || {};
+      return Q[lvl] || Q.high || { dprCap: 2, shadows: true, shadowMap: 2048 };
+    },
+
     // Snapshot for bug reports / tests (never mutates).
     snapshot: function () {
       return {
@@ -113,6 +136,7 @@ LG.Settings = (function () {
         volCrowd: data.volCrowd,
         volMusic: data.volMusic,
         reducedMotion: data.reducedMotion,
+        quality: data.quality,
       };
     },
   };
