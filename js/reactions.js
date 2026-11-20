@@ -164,6 +164,7 @@ LG.Reactions = (function () {
       case 'miss': return { n: 'no', dur: 1.2 };
       case 'hit': return { n: h < 0.5 ? 'hit_stomach' : 'hit_chest', dur: 0.6 };
       case 'save': {
+        if (p._km) return null;            // Build 6: the dive/jump/punch owns the body
         var m = LG.Match, ball = m && m.ball;
         if (!ball) return { n: 'hit_chest', dur: 0.5 };
         var lx = Math.cos(p.facing || 0), lz = -Math.sin(p.facing || 0);   // the keeper's left

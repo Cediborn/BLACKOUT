@@ -113,8 +113,47 @@ LG.Weather = (function () {
     scene.add(sheen);
   }
 
+  // ---- FOG: the current time-of-day fog pulled in close (Build 6) ----
+  function applyFog(on) {
+    if (!scene || !scene.fog || !LG.Lighting || !LG.Lighting.fogBase) return;
+    var b = LG.Lighting.fogBase();
+    scene.fog.color.setHex(b.color);
+    if (!on) { scene.fog.near = b.near; scene.fog.far = b.far; return; }
+    var dark = LG.Lighting.mode && LG.Lighting.mode() !== 'day';
+    scene.fog.color.lerp(new THREE.Color(dark ? 0x1c232c : 0xa7adb2), dark ? 0.5 : 0.75);
+    scene.fog.near = 6;
+    scene.fog.far = Math.max(34, b.far * 0.32);
+  }
+
+  // ---- WIND: gusts carry dust and leaves across, and bend balls in the air ----
+  var dust = null, dpos = null, dvel = null, DUST = 260, windT = 0;
+  function buildDust() {
+    dpos = new Float32Array(DUST * 6); dvel = new Float32Array(DUST);
+    for (var i = 0; i < DUST; i++) seedDust(i, true);
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(dpos, 3));
+    dust = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xb59a73, transparent: true, opacity: 0.55, depthWrite: false }));
+    dust.frustumCulled = false; dust.name = 'weatherWind';
+    scene.add(dust);
+  }
+  function seedDust(i, anywhere) {
+    var o = i * 6, x = anywhere ? (Math.random() * 2 - 1) * BOX.w : -BOX.w - Math.random() * 8;
+    var y = Math.random() < 0.7 ? Math.random() * 1.2 : Math.random() * 6;
+    var z = (Math.random() * 2 - 1) * BOX.d, len = 0.18 + Math.random() * 0.5;
+    dpos[o] = x; dpos[o + 1] = y; dpos[o + 2] = z;
+    dpos[o + 3] = x + len; dpos[o + 4] = y + (Math.random() - 0.5) * 0.08; dpos[o + 5] = z + (Math.random() - 0.5) * 0.1;
+    dvel[i] = 7 + Math.random() * 6;
+  }
+  function gust() { return 0.55 + 0.45 * Math.sin(windT * 0.7) * Math.sin(windT * 0.23 + 1.1); }
+  // world acceleration on a ball in the air (m/s^2); zero unless WIND
+  function windAccel() {
+    if (kind !== 'wind') return { x: 0, z: 0 };
+    var g = gust();
+    return { x: 3.2 * g, z: 0.9 * g };
+  }
+
   function set(k) {
-    var want = k === 'rain' ? 'rain' : 'dry';
+    var want = (k === 'rain' || k === 'fog' || k === 'wind') ? k : 'dry';
     if (!scene || !window.THREE) { kind = want; return kind; }
     // re-wet every time: a court change builds a new, dry surface
     wetten(false);
@@ -129,11 +168,25 @@ LG.Weather = (function () {
       if (rings) rings.visible = false;
       if (sheen) sheen.visible = false;
     }
+    applyFog(want === 'fog');
+    if (want === 'wind') { if (!dust) buildDust(); dust.visible = true; }
+    else if (dust) dust.visible = false;
     kind = want;
     return kind;
   }
 
   function update(dt) {
+    windT += dt;
+    if (kind === 'wind' && dust) {
+      var gs = gust(), dd = Math.min(dt, 0.05);
+      for (var j = 0; j < DUST; j++) {
+        var q = j * 6, mvx = dvel[j] * gs * dd;
+        dpos[q] += mvx; dpos[q + 3] += mvx;
+        dpos[q + 1] += Math.sin(windT * 3 + j) * 0.01; dpos[q + 4] = dpos[q + 1] + 0.02;
+        if (dpos[q] > BOX.w) seedDust(j, false);
+      }
+      dust.geometry.attributes.position.needsUpdate = true;
+    }
     if (kind !== 'rain' || !streaks) return;
     dt = Math.min(dt, 0.05);
     var drift = WIND * dt;
@@ -183,6 +236,7 @@ LG.Weather = (function () {
     update: update,
     kind: function () { return kind; },
     active: function () { return kind === 'rain' && !!streaks && streaks.visible; },
+    windAccel: windAccel,
     info: function () { return { kind: kind, drops: count, wet: wetMats.length }; },
   };
 })();

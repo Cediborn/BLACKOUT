@@ -556,3 +556,105 @@ body.reduced-motion .ld-lights i.next { animation: none; }
 #toast { font-family: var(--font-ui); font-weight: 800; letter-spacing: 0.14em; border-radius: 0; }
 #coin-chip { border-radius: 0; font-family: var(--font-ui); font-weight: 800; }
 #now-playing { font-family: var(--font-ui); border-radius: 0; }
+
+/* ---------------- Build 6: COURT + CONDITIONS, one screen ---------------- */
+#court-overlay .panel.court-panel {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  gap: clamp(14px, 2.6vw, 28px); max-width: 1240px; align-items: stretch;
+}
+.court-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.court-head { display: flex; align-items: baseline; gap: 14px; }
+.court-head .title-xl::after { display: none; }
+.court-count { font-family: var(--font-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.22em; color: var(--mute); }
+#court-overlay .court-grid {
+  display: flex; flex-wrap: nowrap; gap: 10px; overflow-x: auto; overflow-y: hidden;
+  padding: 4px 2px 8px; margin: 0; max-height: none; scroll-snap-type: x proximity;
+  grid-template-columns: none;
+}
+#court-overlay .court-btn {
+  flex: 0 0 clamp(78px, 12vmin, 116px); scroll-snap-align: start;
+  padding: 0; display: flex; flex-direction: column; gap: 0; overflow: hidden;
+}
+#court-overlay .court-thumb { width: 100%; aspect-ratio: 0.56; height: auto; object-fit: cover; border-radius: 0; display: block; }
+#court-overlay .court-thumb.procedural { display: flex; align-items: center; justify-content: center; background: #2a2b2b; font-family: var(--font-ui); font-weight: 800; font-size: 12px; letter-spacing: 0.14em; color: var(--chalk); }
+#court-overlay .court-name { font-size: 10.5px; padding: 4px 4px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#court-overlay .court-btn.selected { box-shadow: 0 0 0 3px var(--pink); }
+.court-sel-k { font-family: var(--font-ui); font-weight: 800; font-size: 12px; letter-spacing: 0.24em; color: var(--pink); }
+.court-sel-name { font-family: var(--font-display); font-size: clamp(28px, 6.4vmin, 48px); line-height: 1; }
+.court-effect { margin-top: auto; background: var(--slab); border-left: 4px solid var(--cyan); padding: 10px 14px; }
+.court-effect-k { font-family: var(--font-ui); font-weight: 800; font-size: 12px; letter-spacing: 0.22em; color: var(--cyan); margin-bottom: 4px; }
+.court-effect-t { font-size: 14px; line-height: 1.45; color: var(--chalk); }
+.court-cond { background: rgba(14, 14, 13, 0.7); border: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.court-cond-title { font-family: var(--font-display); font-size: clamp(22px, 4.4vmin, 30px); }
+.court-cond .option-group { align-items: stretch; gap: 5px; margin: 0; }
+.court-cond .option-label { text-align: left; }
+.court-cond .cond-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; justify-content: stretch; }
+.court-cond .cond-row .option-btn { min-width: 0; padding: 0 2px; font-size: clamp(11px, 2vmin, 13.5px); letter-spacing: 0.08em; }
+.court-nav { margin-top: auto; flex-wrap: nowrap; }
+.court-nav .big-btn { flex: 1; min-width: 0; padding-left: 8px; padding-right: 8px; }
+@media (max-height: 430px) {
+  .court-effect-t { font-size: 12.5px; }
+  .court-cond { gap: 6px; padding: 10px 12px; }
+  .court-cond .cond-row .option-btn { min-height: 36px; }
+  .court-cond-title { display: none; }
+}
+@media (orientation: portrait) { #court-overlay .panel.court-panel { grid-template-columns: 1fr; } }
+
+/* ---------------- Build 6: mode HUDs ---------------- */
+#mode-hud { position: fixed; inset: 0; pointer-events: none; z-index: 14; font-family: var(--font-ui); color: var(--chalk); }
+.so-hud .so-board { position: absolute; top: calc(clamp(56px, 10vmin, 70px) + env(safe-area-inset-top, 0px)); left: calc(clamp(12px, 2vw, 22px) + env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 4px; }
+.so-row { display: flex; align-items: center; gap: 8px; background: rgba(14, 14, 13, 0.85); padding: 6px 10px; }
+.so-who { width: 36px; font-weight: 800; font-size: 12px; letter-spacing: 0.16em; color: var(--pink); }
+.so-who.so-cpu { color: var(--cyan); }
+.so-dots { display: flex; gap: 5px; }
+.so-dots i { width: 13px; height: 13px; border-radius: 50%; border: 2px solid #4a4b4b; box-sizing: border-box; }
+.so-dots i.g { background: var(--chalk); border-color: var(--chalk); }
+.so-dots i.x { border-color: #a8402f; background: rgba(168, 64, 47, 0.35); }
+.so-score { position: absolute; top: calc(clamp(56px, 10vmin, 70px) + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: clamp(24px, 5vmin, 36px); background: rgba(14, 14, 13, 0.8); padding: 2px 16px; }
+.so-bottom { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(520px, 70vw); }
+.so-prompt { font-weight: 800; font-size: clamp(11px, 2.2vmin, 14px); letter-spacing: 0.16em; text-align: center; background: rgba(14, 14, 13, 0.82); padding: 6px 12px; }
+.so-dive { font-family: var(--font-display); font-size: clamp(18px, 4vmin, 26px); color: var(--cyan); min-height: 1em; }
+.so-power { position: relative; width: 100%; height: 12px; background: #2b2d2e; }
+.so-power i { display: block; height: 100%; width: 0; background: var(--pink); }
+.so-power .so-sweet { position: absolute; left: 55%; width: 30%; top: -4px; bottom: -4px; border: 2px solid var(--chalk); box-sizing: border-box; }
+body.mode-shootout #btn-pass, body.mode-shootout #btn-sprint, body.mode-shootout #btn-tackle, body.mode-shootout #btn-switch, body.mode-shootout #special-btn, body.mode-shootout #special-name { visibility: hidden; }
+body.mode-shootout #scoreboard, body.mode-yard #scoreboard { visibility: hidden; }
+.yard-card { position: absolute; top: calc(56px + env(safe-area-inset-top, 0px)); left: calc(clamp(12px, 2vw, 22px) + env(safe-area-inset-left, 0px)); background: rgba(14, 14, 13, 0.88); border-left: 5px solid #7e9a5c; padding: 10px 14px; max-width: 320px; }
+.yard-k { font-weight: 800; font-size: 12px; letter-spacing: 0.22em; color: #a9c48a; }
+.yard-name { font-family: var(--font-display); font-size: clamp(20px, 4.6vmin, 30px); line-height: 1.05; }
+.yard-how { font-family: var(--font-body); font-size: 13px; color: #c4c1b7; }
+.yard-side { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(80px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.yard-clock { font-family: var(--font-display); font-size: clamp(26px, 6vmin, 40px); background: rgba(14, 14, 13, 0.88); padding: 0 12px; }
+.yard-meta { display: flex; gap: 10px; align-items: center; background: rgba(14, 14, 13, 0.88); padding: 4px 10px; font-weight: 800; letter-spacing: 0.14em; }
+.yard-stars { display: flex; gap: 4px; }
+.yard-stars i { width: 16px; height: 16px; clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); background: #4a4b4b; }
+.yard-stars i.on { background: #ffc14d; }
+.yard-next { font-weight: 700; font-size: 11px; letter-spacing: 0.16em; color: var(--mute); background: rgba(14, 14, 13, 0.8); padding: 2px 8px; }
+.rumble-hud { position: absolute; top: calc(clamp(56px, 10vmin, 70px) + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; white-space: nowrap; }
+.rumble-tag { background: var(--rust); color: var(--ink); font-weight: 800; letter-spacing: 0.2em; font-size: 12px; padding: 5px 10px; }
+#rumble-last { background: rgba(14, 14, 13, 0.88); font-family: var(--font-display); font-size: clamp(14px, 3vmin, 20px); padding: 2px 12px; }
+.res-summary { grid-area: lines; display: flex; flex-direction: column; gap: 3px; margin-top: 6px; font-family: var(--font-ui); font-weight: 700; letter-spacing: 0.08em; font-size: 14px; color: var(--chalk); }
+#result-overlay:has(#res-summary:not(.hidden)) #res-coin-lines { display: none; }
+
+/* ---------------- Build 6: FRIEND MATCH ---------------- */
+.friend-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.friend-head .title-xl::after { display: none; }
+.friend-strap { font-family: var(--font-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.2em; color: var(--mute); }
+.friend-you { font-size: 14px; color: var(--cream); margin: 6px 0 10px; }
+.friend-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (orientation: portrait) { .friend-cols { grid-template-columns: 1fr; } }
+.friend-card { background: var(--slab); border-top: 4px solid var(--pink); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.friend-join { border-top-color: var(--cyan); }
+.friend-k { font-family: var(--font-ui); font-weight: 800; font-size: 13px; letter-spacing: 0.22em; color: var(--pink); }
+.friend-join .friend-k { color: var(--cyan); }
+.friend-p { font-size: 14px; color: #c4c1b7; }
+.friend-code { display: flex; gap: 6px; }
+.friend-code span { flex: 1; max-width: 54px; height: clamp(46px, 10vmin, 66px); display: flex; align-items: center; justify-content: center; background: var(--ink); border: 1px solid var(--line-2); font-family: var(--font-display); font-size: clamp(26px, 6vmin, 40px); }
+.friend-btns { display: flex; gap: 8px; }
+.friend-btns .big-btn { flex: 1; margin: 0; min-width: 0; }
+.friend-input { height: clamp(46px, 10vmin, 66px); background: var(--ink); border: 1px solid var(--line-2); color: var(--chalk); font-family: var(--font-display); font-size: clamp(26px, 6vmin, 38px); letter-spacing: 0.3em; padding: 0 12px; text-transform: uppercase; border-radius: 0; width: 100%; box-sizing: border-box; }
+.friend-input:focus { outline: 3px solid var(--cyan); outline-offset: 1px; }
+.friend-join .big-btn { margin: 0; }
+.friend-status { font-family: var(--font-ui); font-weight: 700; font-size: 14px; letter-spacing: 0.12em; color: var(--cream); min-height: 1.2em; }
+.friend-status.err { color: #ff8a7a; }
+.friend-foot { font-size: 12.5px; color: var(--mute); margin-top: 10px; }

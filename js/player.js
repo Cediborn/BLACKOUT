@@ -320,8 +320,12 @@ LG.Player.prototype.fillMeter = function (amount) {
 
 LG.Player.prototype.activateAbility = function () {
   if (!this.meterFull || this.active) return;
-  var def = LG.Abilities[this.def.ability];
-  this.active = { type: this.def.ability, t: def.dur, id: this.def.ability };
+  // Build 6: a Rumble orb grants a one-use ability that beats the own one
+  var abId = this._rumbleAbility || this.def.ability;
+  var def = LG.Abilities[abId];
+  if (!def) return;
+  this._rumbleAbility = null;
+  this.active = { type: abId, t: def.dur, id: abId };
   this.activeColor = def.color;
   this.meter = 0;
   this.meterFull = false;

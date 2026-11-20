@@ -117,6 +117,8 @@ LG.KeeperBrain.prototype = {
       var tz = this.clampZoneZ(th.pz);
       this.moveToward(tx, tz, this.diveReach());
       me.want.sprint = false;
+      // Build 6: commit the body — a dive or a jump the eye can read
+      if (LG.KeeperMotion) LG.KeeperMotion.onThreat(me, tx, tz, ball);
       // face the ball
       var ddx = ball.x - me.x, ddz = ball.z - me.z;
       if (ddx * ddx + ddz * ddz > 0.04) me.facing = Math.atan2(ddx, ddz);

@@ -752,6 +752,10 @@
       UIState = 'menu';
       profileResetArmed = false;
       resultActionLock = false;
+      // Build 6: leaving a friend match closes the link; the guest books nothing
+      if (match && match.opts && match.opts.online === 'guest') match._finalized = true;
+      if (LG.Net && LG.Net.role()) { var wasHost = LG.Net.role() === 'host'; if (!wasHost || match === null || match._finalized) LG.Net.leave(); else setTimeout(function () { LG.Net.leave(); }, 400); }
+      restoreOnlineConditions();
       // leaving mid-match still books the unfinished game once (never re-books)
       if (match && !match._finalized && match.clock !== undefined) {
         quitting = true;
@@ -845,8 +849,11 @@
     });
 
     bus.on('abilityActivated', function (p) {
-      var n = LG.Abilities[p.def.ability].name;
-      LG.HUD.banner('★ ' + n + ' ★', 'team1', 1100);
+      var ab = LG.Abilities[(p.active && p.active.id) || p.def.ability];
+      var n = ab ? ab.label : '';
+      // Build 6: say whose move it is — yours, a mate's or the CPU's
+      LG.HUD.banner('★ ' + n + ' ★', p.team === 0 ? 'team1' : 'team2', 1100);
+      if (p.team === 1) LG.HUD.toast((p.name || 'ROGUE') + ' USED ' + n, 1200);
       LG.HUD.flash('rgba(196,106,43,0.4)', 220);
       camCtrl.pulse(0.8);
     });
@@ -877,6 +884,7 @@
       }
       // ignore a late end from a match we already replaced (quit/rematch)
       if (quitting || match === null) return;
+      if (LG.ModeCtrl) LG.ModeCtrl.hud(false);
       UIState = 'result';
       resultActionLock = false;
       LG.Input.reset();
@@ -896,8 +904,69 @@
     });
   }
 
+  // ---------------- Build 6: FRIEND MATCH screen ----------------
+  function bindFriendUI() {
+    var $ = function (id) { return document.getElementById(id); };
+    function click(id, fn) { var b = $(id); if (b) b.addEventListener('click', function () { LG.Audio.sfx.click(); fn(); }); }
+    function setTxt(id, t) { var e = $(id); if (e) e.textContent = t; }
+    function showCode(c) {
+      var box = $('friend-code');
+      if (!box) return;
+      box.innerHTML = '';
+      for (var i = 0; i < 6; i++) { var d = document.createElement('span'); d.textContent = c ? c[i] : '·'; box.appendChild(d); }
+    }
+    click('btn-friend', function () {
+      if (UIState !== 'menu') return;
+      UIState = 'friend';
+      showOverlay('menu-overlay', false);
+      showOverlay('friend-overlay', true);
+      var me = LG.byId(selectedId);
+      setTxt('friend-you', 'You play as ' + (me ? me.name : 'your star') + ' — change your star in KICK OFF.');
+      showCode('');
+      setTxt('friend-host-status', ''); setTxt('friend-join-status', '');
+    });
+    click('btn-friend-back', function () {
+      if (LG.Net) LG.Net.leave();
+      UIState = 'menu';
+      showOverlay('friend-overlay', false);
+      showOverlay('menu-overlay', true);
+    });
+    click('btn-friend-host', function () {
+      if (!LG.Net) return;
+      if (LG.Audio.unlock) LG.Audio.unlock();
+      showCode(LG.Net.host());
+    });
+    click('btn-friend-copy', function () {
+      var c = LG.Net && LG.Net.code();
+      if (!c) return;
+      try { navigator.clipboard.writeText(c); LG.HUD.toast('CODE COPIED', 900); } catch (e) { /* no clipboard */ }
+    });
+    var inp = $('friend-input');
+    if (inp && inp.addEventListener) inp.addEventListener('input', function () { inp.value = LG.Net ? LG.Net.cleanCode(inp.value) : inp.value; });
+    click('btn-friend-join', function () {
+      if (!LG.Net || !inp) return;
+      if (LG.Audio.unlock) LG.Audio.unlock();
+      LG.Net.join(inp.value);
+    });
+    if (!LG.Net) return;
+    LG.Net.on('status', function (e) {
+      var el = LG.Net.role() === 'guest' ? 'friend-join-status' : 'friend-host-status';
+      setTxt(el, e.msg || '');
+      var w = $(el); if (w && w.classList) w.classList.toggle('err', e.status === 'error');
+    });
+    LG.Net.on('start', function (e) { if (UIState === 'friend') startOnline(e.role, e.setup); });
+    LG.Net.on('closed', function () {
+      if (UIState === 'match' || UIState === 'paused') {
+        LG.HUD.toast('YOUR FRIEND LEFT', 2200);
+        if (match && match.opts.online === 'host' && !match._finalized) match.endMatch();
+        else if (match && match.opts.online === 'guest') setTimeout(function () { LG.eventBus.emit('quitRequested'); }, 1600);
+      }
+    });
+  }
+
   // ---------------- match settings (Time of Day / View) ----------------
   function bindSettingsUI() {
+    bindFriendUI();
     function on(id, fn) {
       var b = document.getElementById(id);
       if (!b) return;
@@ -909,6 +978,14 @@
     on('time-blackout', function () { setTimeOfDay('blackout'); });
     on('weather-dry', function () { setWeather('dry'); });
     on('weather-rain', function () { setWeather('rain'); });
+    on('weather-fog', function () { setWeather('fog'); });
+    on('weather-wind', function () { setWeather('wind'); });
+    ['empty', 'locals', 'busy', 'packed'].forEach(function (c) {
+      on('crowd-' + c, function () { LG.Settings.setCrowd(c); applyConditions(); refreshSettingsUI(); });
+    });
+    ['off', 'low', 'med', 'full'].forEach(function (l) {
+      on('life-' + l, function () { LG.Settings.setLife(l); applyConditions(); refreshSettingsUI(); });
+    });
     on('view-portrait', function () { setView('portrait'); });
     on('view-landscape', function () { setView('landscape'); });
     // Settings screen (Phase 4) — same stores, separate controls
@@ -1109,7 +1186,17 @@
     // cheap reconfigure — the environment is already built, only the lighting
     // presets are re-applied (no rebuild, no reload)
     LG.Lighting.setMode(LG.Settings.timeOfDay());
+    if (LG.Weather) LG.Weather.set(LG.Settings.weather());   // fog rides on the time's fog
     refreshSettingsUI();
+  }
+
+  // Build 6: crowd + street life levels onto the living street
+  function applyConditions() {
+    try {
+      if (LG.Crowd && LG.Crowd.setDensity) LG.Crowd.setDensity(LG.Settings.crowdFrac());
+      if (LG.Living && LG.Living.setLife) LG.Living.setLife(LG.Settings.lifeFrac());
+      if (LG.StreetLife && LG.StreetLife.setLevel) LG.StreetLife.setLevel(LG.Settings.lifeFrac());
+    } catch (e) { /* a level change must never break the menu */ }
   }
 
   // Build 5: rain on/off — re-wets the current surface, no rebuild
@@ -1138,6 +1225,11 @@
       ['time-day', tod === 'day'], ['time-dusk', tod === 'dusk'],
       ['time-night', tod === 'night'], ['time-blackout', tod === 'blackout'],
       ['weather-dry', LG.Settings.weather() === 'dry'], ['weather-rain', LG.Settings.weather() === 'rain'],
+      ['weather-fog', LG.Settings.weather() === 'fog'], ['weather-wind', LG.Settings.weather() === 'wind'],
+      ['crowd-empty', LG.Settings.crowd() === 'empty'], ['crowd-locals', LG.Settings.crowd() === 'locals'],
+      ['crowd-busy', LG.Settings.crowd() === 'busy'], ['crowd-packed', LG.Settings.crowd() === 'packed'],
+      ['life-off', LG.Settings.life() === 'off'], ['life-low', LG.Settings.life() === 'low'],
+      ['life-med', LG.Settings.life() === 'med'], ['life-full', LG.Settings.life() === 'full'],
       ['view-portrait', view === 'portrait'], ['view-landscape', view === 'landscape'],
     ];
     for (var i = 0; i < pairs.length; i++) {
@@ -1154,7 +1246,14 @@
         night: 'NIGHT: floodlights on, headlights on the ring road.',
         blackout: 'BLACKOUT: the power is cut. Moonlight, a flickering generator lamp and car headlights light the court.',
       };
-      note.textContent = (NOTE[tod] || '') + (wet ? ' RAIN: wet, shiny asphalt and splashes.' : '');
+      var WX = { dry: '', rain: ' RAIN: wet, shiny asphalt reflects the lights and slides spray water.',
+        fog: ' FOG: the far end of the court fades out; long passes are harder to read.',
+        wind: ' WIND: gusts blow dust across and bend balls in the air.' };
+      var CR = { empty: ' Empty stands.', locals: ' A few locals watching.', busy: ' Busy stands.', packed: ' Packed stands.' };
+      note.textContent = (NOTE[tod] || '') + (WX[LG.Settings.weather()] || '');
+      var eff = document.getElementById('court-effect');
+      if (eff) eff.textContent = note.textContent + (CR[LG.Settings.crowd()] || '') +
+        (LG.Settings.life() === 'off' ? ' Quiet street: no traffic or walkers.' : '');
     }
   }
 
@@ -1170,6 +1269,7 @@
       LG.Lighting.setMode(LG.Settings.timeOfDay());
     }
     if (LG.Weather) LG.Weather.set(LG.Settings.weather());
+    applyConditions();
   }
 
   // Reflect the selected level on the difficulty screen.
@@ -1207,6 +1307,12 @@
       }
       if (focusDone) headline = 'CHALLENGE CLEARED';
       else headline = r.won === 1 ? 'MATCH WON' : r.won === 0 ? 'DRAW' : 'MATCH LOST';
+    } else if (r.ctrl === 'shootout') {
+      headline = r.won === 1 ? 'SHOOTOUT WON' : 'SHOOTOUT LOST';
+    } else if (r.ctrl === 'yard') {
+      headline = 'TRAINING DONE';
+    } else if (r.online) {
+      headline = r.won === 1 ? 'YOU BEAT YOUR FRIEND' : r.won === 0 ? 'DRAW' : 'YOUR FRIEND WON';
     } else {
       headline = r.won === 1 ? 'MATCH WON' : r.won === 0 ? 'DRAW' : 'MATCH LOST';
     }
@@ -1217,6 +1323,8 @@
     if (modeTag) {
       var tagText = modeId === 'tournament' && T ? ('STREET CUP · ' + T.roundLabel())
         : modeId === 'challenge_match' ? 'CHALLENGE MATCH'
+        : r.online ? 'FRIEND MATCH · ONLINE'
+        : (LG.Modes && LG.Modes.def(modeId)) ? LG.Modes.def(modeId).name
         : 'QUICK MATCH';
       modeTag.textContent = tagText;
       modeTag.classList.remove('hidden');
@@ -1226,6 +1334,16 @@
     document.getElementById('res-away').textContent = r.score[1];
     document.getElementById('res-coins-n').textContent = '+' + U.fmtMoney(r.coins);
     if (LG.Hub) LG.Hub.resultCoins(r);
+    // Build 6: shootout dots / drill scores
+    var msAway = document.getElementById('ms-away-name');
+    if (msAway) msAway.textContent = r.online ? 'FRIEND' : (r.awayName && r.awayName !== 'YOU' ? r.awayName : 'ROGUE');
+    var sumEl = document.getElementById('res-summary');
+    if (sumEl) {
+      sumEl.innerHTML = '';
+      (r.summary || []).forEach(function (line) { var d = document.createElement('div'); d.className = 'rs-line'; d.textContent = line; sumEl.appendChild(d); });
+      sumEl.classList.toggle('hidden', !(r.summary && r.summary.length));
+    }
+    if (r.ctrl === 'yard') document.getElementById('res-coins-n').textContent = '+' + U.fmtMoney((r.summary && match && match.ctrl ? match.ctrl.results.reduce(function (a, x) { return a + x.coins; }, 0) : 0));
     // match statistics table (missing stats degrades to zeros / 50%)
     var s = r.stats || {};
     var h = s.home || {};
@@ -1298,6 +1416,8 @@
         btnRematch.classList.add('gold');
         btnSetup.classList.remove('hidden');
       }
+      // Build 6: a friend match ends with MAIN MENU only (host a new code to replay)
+      if (r.online) { btnRematch.classList.add('hidden'); btnSetup.classList.add('hidden'); }
     }
     if (note) {
       if (modeId === 'tournament') note.textContent = 'ONE CUP · TWO WINS · NO SHORTCUTS';
@@ -1414,8 +1534,12 @@
     tournament: 'M7 4h10v4a5 5 0 01-10 0zM7 6H4a3 3 0 003 4M17 6h3a3 3 0 01-3 4M12 13v4M8 21h8M9 17h6',
     first_to_5: 'M5 21V4M5 4h11l-2 4 2 4H5',
     street_twist: 'M20 14A8 8 0 1110 4a6 6 0 0010 10z',
+    penalty_shootout: 'M3 20V6h18v14M3 10h18M8 6v14M16 6v14',
+    the_yard: 'M4 20l4-8 4 4 4-10 4 14M3 20h18',
+    rumble: 'M13 2L4 14h7l-1 8 9-12h-7z',
   };
-  var MODE_SOON = [
+  var MODE_SOON = [];   // Build 6: all three are playable now
+  var MODE_SOON_OLD = [
     { name: 'PENALTY SHOOTOUT', blurb: 'Five kicks each. Aim, charge, shoot, then dive the right way.', icon: 'M3 20V6h18v14M3 10h18M8 6v14M16 6v14' },
     { name: 'THE YARD', blurb: 'Training drills with 3-star scores.', icon: 'M4 20l4-8 4 4 4-10 4 14M3 20h18' },
     { name: 'RUMBLE', blurb: 'Grab orbs on the court to fire any of the 8 abilities.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z' },
@@ -1444,6 +1568,9 @@
         var tag = m.id === 'tournament' ? (T && T.active() ? 'IN PROGRESS · ' + T.roundLabel() : 'KNOCKOUT · 4 TEAMS')
           : m.id === 'challenge_match' ? 'USES YOUR 3 ACTIVE CHALLENGES'
           : m.id === 'first_to_5' ? 'NO CLOCK PRESSURE · NO DRAWS'
+          : m.id === 'penalty_shootout' ? 'NEW · 5 KICKS EACH'
+          : m.id === 'the_yard' ? 'NEW · TRAINING · 3 DRILLS'
+          : m.id === 'rumble' ? 'NEW · POWER-UP ORBS'
           : tw ? 'TODAY: ' + tw.label
           : 'STANDARD MATCH';
         var blurb = tw ? tw.blurb + ' ' + m.blurb : m.blurb;
@@ -1641,7 +1768,7 @@
     return (window.performance && performance.now) ? performance.now() : Date.now();
   }
 
-  function startMatch(playerId) {
+  function startMatch(playerId, online) {
     var t0 = nowMs();
     selectedId = playerId;
     saveLastSetup();
@@ -1691,6 +1818,8 @@
     }
     // the mode's rules ride into the match (Phase 10 / 11)
     var rules = (LG.Modes && LG.Modes.rules) ? LG.Modes.rules() : {};
+    // Build 6: a FRIEND MATCH is a plain match on the host's setup
+    if (online) { rules = { goldenGoal: false, firstTo: 0, duration: 0, twist: null }; matchOpts.mode = 'friend_match'; }
     matchOpts.goldenGoal = !!rules.goldenGoal;
     matchOpts.firstTo = rules.firstTo > 0 ? rules.firstTo : 0;
     matchOpts.duration = rules.duration > 0 ? rules.duration : 0;
@@ -1700,6 +1829,16 @@
     // phone screens get one extra size bump, baked into every player as it is
     // built (model + collision body + height move together) — see LG.Config.player
     if (LG.Player) LG.Player.deviceScale = isMobile ? (LG.Config.player.mobileScale || 1) : 1;
+    if (online) {
+      var S = online.setup;
+      matchOpts.online = online.role;
+      matchOpts.awayIds = S.awayIds;
+      matchOpts.outfitColor = S.homeKit; matchOpts.awayColor = S.awayKit;
+      matchOpts.homeStyle = S.homeStyle; matchOpts.awayStyle = S.awayStyle;
+      matchOpts.homeName = online.role === 'host' ? 'YOU' : 'FRIEND';
+      matchOpts.awayName = online.role === 'host' ? 'FRIEND' : 'YOU';
+      matchOpts.noAISpecials = false;
+    }
 
     var t1 = nowMs();
     match = new LG.MatchManager(matchOpts);
@@ -1707,6 +1846,10 @@
     match.attachScene(scene, arenaObj);
     match.camera = camCtrl;
     match.selectActive();
+    // Build 6: shootout / yard / rumble ride on the match as a controller
+    match.ctrl = online ? (online.role === 'host' ? new LG.Net.HostCtrl(match) : new LG.Net.GuestCtrl(match))
+      : ((LG.ModeCtrl && LG.ModeCtrl.create) ? LG.ModeCtrl.create(matchOpts.mode) : null);
+    if (LG.ModeCtrl && !match.ctrl) LG.ModeCtrl.hud(false);
 
     // the ball is read a touch larger on phones only
     if (isMobile && match.ball && match.ball.mesh) {
@@ -1721,6 +1864,7 @@
     camCtrl.pulse(0.6);
     LG.Particles.clear();
     match.start();
+    if (match.ctrl && match.ctrl.start) match.ctrl.start(match);
     UIState = 'match';
     // announce the bent rule (Phase 11)
     try {
@@ -1734,6 +1878,7 @@
   }
 
   function clearMatchFromScene() {
+    if (match.ctrl && match.ctrl.stop) { try { match.ctrl.stop(); } catch (e) { /* cosmetic */ } }
     if (match.ball && match.ball.mesh) scene.remove(match.ball.mesh);
     if (match.ballGlow) scene.remove(match.ballGlow);
     if (match.carrierMark) scene.remove(match.carrierMark);
@@ -1752,7 +1897,7 @@
     document.getElementById('scoreboard').classList.toggle('hidden', !on);
     document.getElementById('pause-btn').classList.toggle('hidden', !on);
     document.getElementById('coin-chip').classList.toggle('hidden', false);
-    var overlays = ['menu-overlay', 'mode-overlay', 'challenge-pick-overlay', 'tournament-overlay', 'diff-overlay', 'select-overlay', 'style-overlay', 'court-overlay', 'setup-overlay', 'how-overlay', 'settings-overlay', 'about-overlay', 'profile-overlay', 'challenges-overlay', 'pause-overlay', 'result-overlay'];
+    var overlays = ['menu-overlay', 'mode-overlay', 'challenge-pick-overlay', 'tournament-overlay', 'diff-overlay', 'select-overlay', 'style-overlay', 'court-overlay', 'setup-overlay', 'how-overlay', 'settings-overlay', 'about-overlay', 'profile-overlay', 'challenges-overlay', 'pause-overlay', 'result-overlay', 'friend-overlay'];
     for (var i = 0; i < overlays.length; i++) document.getElementById(overlays[i]).classList.add('hidden');
   }
 
@@ -2048,6 +2193,14 @@
       var id = i === 0 ? '' : (list[i - 1] ? list[i - 1].id : '');
       btns[i].classList.toggle('selected', id === selected);
     }
+    // Build 6: name the pick under the strip and count the grounds
+    var nm = 'CLASSIC STREET';
+    for (var j = 0; j < list.length; j++) if (list[j].id === selected) nm = list[j].name || nm;
+    var sel = document.getElementById('court-sel-name');
+    if (sel) sel.textContent = nm;
+    var cnt = document.getElementById('court-count');
+    if (cnt) cnt.textContent = (list.length + 1) + ' GROUNDS';
+    refreshSettingsUI();
   }
 
   // Apply outfit colors to a player definition (returns a new palette)
@@ -2064,7 +2217,7 @@
   function nowSec() { return performance.now() / 1000; }
 
   var MENU_ORBIT = { mode: 1, challengePick: 1, tournament: 1, diff: 1, select: 1, style: 1, court: 1, setup: 1,
-    settings: 1, about: 1, profile: 1, challenges: 1, how: 1 };
+    settings: 1, about: 1, profile: 1, challenges: 1, how: 1, friend: 1 };
   function loop() {
     requestAnimationFrame(loop);
     var now = nowSec();
@@ -2104,6 +2257,9 @@
         var leadZ = act.z + U.clamp(act.vz * 0.24, -1.6, 1.6);
         camCtrl.update(dt, leadX, leadZ, match.ball.x, match.ball.z);
       }
+      // Build 6: a mode can frame its own shot (the shootout's behind-the-kicker view)
+      var mc = match.ctrl && match.ctrl.cam ? match.ctrl.cam() : null;
+      if (mc && camera) { camera.position.set(mc.p[0], mc.p[1], mc.p[2]); camera.lookAt(mc.l[0], mc.l[1], mc.l[2]); }
       LG.HUD.updateSpecial(match.active);
       LG.HUD.updateCoins();
       LG.HUD.aim(match.active.shotCharge > 0.15 && match.active.hasBall);
@@ -2188,8 +2344,50 @@
 
   // boot
   window.addEventListener('load', init);
+  // ---------------- Build 6: FRIEND MATCH glue ----------------
+  var savedConditions = null;
+  function restoreOnlineConditions() {
+    if (!savedConditions) return;
+    var c = savedConditions; savedConditions = null;
+    try {
+      if (LG.Courts) LG.Courts.set(c.court);
+      LG.Settings.setTimeOfDay(c.tod); LG.Settings.setWeather(c.weather);
+      LG.Settings.setCrowd(c.crowd); LG.Settings.setLife(c.life);
+      refreshEnvironment(true);
+    } catch (e) { /* cosmetic */ }
+  }
+  // host: the setup both phones will build (host's star, court, conditions)
+  function onlineSetup(guestStar, guestKit) {
+    var g = LG.byId(guestStar) ? guestStar : 'cannon';
+    var gd = LG.byId(g), awayIds = [g];
+    (gd.team || []).forEach(function (id) { if (awayIds.length < 3 && awayIds.indexOf(id) < 0) awayIds.push(id); });
+    ['stone', 'volt', 'brute', 'echo', 'pulse', 'cannon'].forEach(function (id) { if (awayIds.length < 3 && awayIds.indexOf(id) < 0) awayIds.push(id); });
+    var awayKit = (guestKit && guestKit.color != null && (!outfitColor || guestKit.color !== outfitColor.color)) ? guestKit : awayColor;
+    return {
+      hostStar: selectedId, awayIds: awayIds,
+      homeKit: outfitColor, awayKit: awayKit, homeStyle: homeStyle, awayStyle: (guestKit && guestKit.style) || awayStyle,
+      court: LG.Courts ? LG.Courts.selected() : '', tod: LG.Settings.timeOfDay(), weather: LG.Settings.weather(),
+      crowd: LG.Settings.crowd(), life: LG.Settings.life(),
+    };
+  }
+  function startOnline(roleName, setup) {
+    if (roleName === 'guest') {
+      savedConditions = { court: LG.Courts ? LG.Courts.selected() : '', tod: LG.Settings.timeOfDay(), weather: LG.Settings.weather(), crowd: LG.Settings.crowd(), life: LG.Settings.life() };
+      if (LG.Courts) LG.Courts.set(setup.court || '');
+      LG.Settings.setTimeOfDay(setup.tod); LG.Settings.setWeather(setup.weather);
+      LG.Settings.setCrowd(setup.crowd); LG.Settings.setLife(setup.life);
+      refreshEnvironment(true);
+    }
+    showOverlay('friend-overlay', false);
+    startMatch(roleName === 'host' ? selectedId : setup.hostStar, { role: roleName, setup: setup });
+    LG.HUD.toast(roleName === 'host' ? 'FRIEND MATCH — YOU ARE THE HOME SIDE' : 'FRIEND MATCH — YOU ARE THE AWAY SIDE', 2400);
+  }
+
   window.LGMain = {
     startMatch: startMatch,
+    startOnline: startOnline,
+    onlineSetup: onlineSetup,
+    selections: function () { return { star: selectedId, kit: outfitColor ? { id: outfitColor.id, color: outfitColor.color, style: homeStyle } : null }; },
     getState: function () { return UIState; },
     getMatch: function () { return match; },
     // read-only view of the layout pipeline: the size the renderer was last

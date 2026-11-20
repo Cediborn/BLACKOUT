@@ -373,8 +373,8 @@ try {
   elements['btn-play'].fire('click');
   flow = 'mode';
   check(vis('mode-overlay') && !vis('menu-overlay'), 'KICK OFF opens GAME MODE', 'mode=' + vis('mode-overlay') + ' menu=' + vis('menu-overlay'));
-  check(!!LG.Modes && typeof LG.Modes.select === 'function' && LG.Modes.list().length === 5,
-    'LG.Modes exposes 5 modes', LG.Modes && LG.Modes.list().map(function (m) { return m.id; }).join(','));
+  check(!!LG.Modes && typeof LG.Modes.select === 'function' && LG.Modes.list().length === 8,
+    'LG.Modes exposes 8 modes (Build 6)', LG.Modes && LG.Modes.list().map(function (m) { return m.id; }).join(','));
   // BACK from mode returns to menu
   elements['btn-mode-back'].fire('click');
   check(vis('menu-overlay') && !vis('mode-overlay'), 'MODE BACK returns to the main menu');
@@ -1480,7 +1480,7 @@ section('9. game modes + tournament (Phase 3D: once-only fixtures, mode-aware re
   var M = LG.Modes;
   var T = LG.Tournament;
 
-  check(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 5), 'five mode definitions', M && M.DEFS.length);
+  check(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 8), 'eight mode definitions (Build 6)', M && M.DEFS.length);
   check(!!(T && typeof T.start === 'function' && typeof T.endMatch === 'function'), 'LG.Tournament exposes the cup API');
   check(['quick_match', 'challenge_match', 'tournament', 'first_to_5', 'street_twist'].indexOf(M.id()) >= 0, 'mode id is always a registered mode', M.id());
 
@@ -1494,7 +1494,7 @@ section('9. game modes + tournament (Phase 3D: once-only fixtures, mode-aware re
   for (var mci = 0; mci < modeCards.length; mci++) {
     if (/mode-soon/.test(modeCards[mci].className || '')) soon++; else playable.push(modeCards[mci]);
   }
-  check(playable.length === 5 && soon === 3, 'mode list renders 5 playable modes + 3 SOON tiles', playable.length + '+' + soon);
+  check(playable.length === 8 && soon === 0, 'mode list renders 8 playable modes (Build 6: no SOON tiles left)', playable.length + '+' + soon);
   modeCards = playable;
   // pick CHALLENGE MATCH card -> CONTINUE -> challenge pick
   modeCards[1].fire('click');

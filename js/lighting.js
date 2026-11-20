@@ -246,6 +246,8 @@ LG.Lighting = (function () {
     collect: collect,
     setMode: setMode,
     update: update,
+    // Build 6: the clear-weather fog of the current preset (weather.js thickens it)
+    fogBase: function () { var P = PRESETS[mode]; return { color: P.fogColor, near: P.fogNear, far: P.fogFar }; },
     modes: function () { return Object.keys(PRESETS); },
     mode: function () { return mode; },
     // what the environment actually contained when collect() ran

@@ -468,6 +468,10 @@ LG.MatchManager.prototype = {
 
     if (this._autoSwitchT > 0) this._autoSwitchT = Math.max(0, this._autoSwitchT - dt);
 
+    // Build 6: a mode controller (shootout / yard / rumble / online guest)
+    // may own the whole frame; the presentation tail still runs
+    if (this.ctrl && this.ctrl.update && this.ctrl.update(this, dt) === true) { this.frameTail(dt); return; }
+
     switch (this.state) {
       case 'KICKOFF':
         this.updatePlayers(0);
@@ -497,6 +501,8 @@ LG.MatchManager.prototype = {
         if (this.goldenGoal) this.tickGoldenGoal(dt);
         else this.tickTimer(dt);
         this.updatePlayers(dt);
+        // Build 6: the CPU side fires its special moves too
+        if (LG.AISpecials) LG.AISpecials.update(this, dt);
         if (!this.goldenGoal && this.clock <= 0) {
           // a tie at 0:00 in a mode that allows it plays on: next goal wins
           if (this.opts.goldenGoal && this.score[0] === this.score[1]) this.startGoldenGoal();
@@ -514,6 +520,12 @@ LG.MatchManager.prototype = {
         this._ballPrevX = this.ball.x;
         this._ballPrevZ = this.ball.z;
         this._ballPrevY = this.ball.y;
+        // Build 6: WIND bends a ball in the air (presentation-only weather
+        // otherwise; the sim never loads weather.js, so it is untouched)
+        if (LG.Weather && LG.Weather.windAccel && !this.ball.owner && this.ball.y > 0.35) {
+          var wa = LG.Weather.windAccel();
+          this.ball.vx += wa.x * dt; this.ball.vz += wa.z * dt;
+        }
         this.ball.step(dt, this.arena);
         this.updateKeepers(dt);    // goalkeepers save/parry BEFORE the goal check
         this.checkGoal();
@@ -523,7 +535,11 @@ LG.MatchManager.prototype = {
         this.updatePlayers(0);
         break;
     }
+    this.frameTail(dt);
+  },
 
+  // presentation that runs after every frame, whoever owned the gameplay
+  frameTail: function (dt) {
     this.ballGlow.position.x = this.ball.x;
     this.ballGlow.position.z = this.ball.z;
     var owned = !!this.ownerPlayer();
@@ -536,13 +552,15 @@ LG.MatchManager.prototype = {
     // extended to live play). GOAL itself is celebration-owned: update()
     // stands down there.
     if (LG.Reactions) LG.Reactions.update(this, dt);
+    // Build 6: keeper dives / jumps / crouch laid over the placed bodies
+    if (LG.KeeperMotion) LG.KeeperMotion.update(this, dt);
   },
 
   ticks: function (dt) {
     // tiny passive meter fill
     for (var i = 0; i < this.all.length; i++) {
       var p = this.all[i];
-      if (!p.meterFull && !p.active) p.fillMeter(dt * 0.014);
+      if (!p.meterFull && !p.active && !this.opts.noMeterFill) p.fillMeter(dt * 0.014);
       LG.Abilities.tickPerfectPass(p, dt);
     }
   },
@@ -621,15 +639,16 @@ LG.MatchManager.prototype = {
   },
 
   resolveHuman: function (h, dt) {
-    var inp = LG.Input;
-    var mv = inp.moveVec();
-    var wv = this.screenToWorldMove(mv);
+    // Build 6: an online friend's player reads a remote input source that
+    // already speaks world space; everyone else reads this device
+    var inp = h.inputSrc || LG.Input;
+    var wv = h.inputSrc ? h.inputSrc.worldMove() : this.screenToWorldMove(inp.moveVec());
 
     h.want.x = wv.x;
     h.want.z = wv.z;
     h.want.sprint = inp.down('sprint');
 
-    if (inp.pressed('pause')) this.bus.emit('pauseRequested');
+    if (!h.inputSrc && inp.pressed('pause')) this.bus.emit('pauseRequested');
 
     if (this.state !== 'PLAY') {
       h.want.x = h.want.z = 0; h.want.sprint = false;
@@ -658,7 +677,7 @@ LG.MatchManager.prototype = {
         if (h.hasBall) {
           this.humanPass(h);
           this.bus.emit('actionPerformed', { type: 'pass', player: h });
-        } else if (carrierNow && carrierNow !== h && !this._switchedThisFrame) {
+        } else if (carrierNow && carrierNow !== h && !this._switchedThisFrame && h.team === 0) {
           // our team has it but someone else is carrying: jump onto them
           this._switchedThisFrame = true;
           this.activatePlayer(carrierNow, false);
@@ -684,7 +703,7 @@ LG.MatchManager.prototype = {
       // A switch must fire once per frame: the loop re-resolves whoever just
       // became active, who would otherwise see the SAME switch edge and flip
       // straight back.
-      if ((inp.pressed('switch') || inp.pressed('pass')) && !this._switchedThisFrame) {
+      if ((inp.pressed('switch') || inp.pressed('pass')) && !this._switchedThisFrame && h.team === 0) {
         this._switchedThisFrame = true;
         this.switchPlayer();
       }
@@ -1569,6 +1588,8 @@ LG.MatchManager.prototype = {
     }
 
     if (!goalZ) return;
+    // Build 6: drills and shootouts judge the line themselves
+    if (this.ctrl && this.ctrl.goalLine && this.ctrl.goalLine(this, goalZ) === true) return;
 
     // Goal attribution is by NET: whichever goal the ball crossed into, the
     // OTHER team scores. A genuine own goal counts too — a defender's deflection
@@ -1615,7 +1636,7 @@ LG.MatchManager.prototype = {
     LG.Audio.sfx.goal(teamGot === 0);
     // meter for scoring side
     var scorers = this.teamPlayers(teamGot);
-    scorers.forEach(function (pp) { pp.fillMeter(0.3); });
+    if (!this.opts.noMeterFill) scorers.forEach(function (pp) { pp.fillMeter(0.3); });
     if (scorer) this.award(scorer, 'goal', 0.3);
     if (assist) this.award(assist, 'pass', 0.06);
 
@@ -1663,7 +1684,13 @@ LG.MatchManager.prototype = {
       firstTo: this.opts.firstTo > 0 ? this.opts.firstTo : 0,
       twist: this.opts.twist || null,
     };
-    if (LG.Progression && LG.Progression.finalizeMatch) {
+    if (this.ctrl) {
+      result.ctrl = this.ctrl.kind;
+      if (this.ctrl.summary) result.summary = this.ctrl.summary(this);
+      if (this.opts.online) result.online = true;
+    }
+    // practice (The Yard) pays its own star coins and is not a league result
+    if (LG.Progression && LG.Progression.finalizeMatch && !(this.ctrl && this.ctrl.noProgress)) {
       result = LG.Progression.finalizeMatch(result) || result;
     }
     this.bus.emit('matchEnd', result);

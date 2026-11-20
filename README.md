@@ -32,6 +32,21 @@ To film every menu and check the Build 5 screens (also part of `npm test`):
 node tools/look.js tools/looks/menus.js --out looks-out/build5
 ```
 
+## What's new in 1.6.0
+
+- **Courts and conditions on one screen:** pick the court from a strip of tiles and set TIME (day, dusk, night, blackout), WEATHER (dry, rain, fog, wind), CROWD (empty to packed) and STREET LIFE (off to full) right beside it. A box explains what each pick changes on the pitch. Fog pulls the far end in; wind blows dust across and bends balls in the air.
+- **Penalty Shootout:** five kicks each, then sudden death. Aim with the stick, hold SHOOT to charge (overhit flies over the bar), and when the CPU kicks, hold the stick left or right to pick your keeper's dive.
+- **The Yard (training):** three 40-second drills: Target Practice, Speed Gates and Pass & Move, with 3 stars each. Every new star pays 25 coins once; your best scores are saved.
+- **Rumble:** a full match where specials only come from glowing orbs on the court; run over one to grab any of the 8 abilities.
+- **The CPU uses special moves:** each ROGUE player fires its ability when the moment fits (a burst into space, a power shot in range, Ice Grip as you bear down on goal…). EASY hesitates, HARD pounces.
+- **Real goalkeeping:** keepers dive full stretch (take-off, flight, land on the side, get up), spring for high balls, crouch when an attacker closes in, throw short distributions and punch parries.
+- **FRIEND MATCH:** host gets a 6-character code, your friend types it in, and you play each other online, phone to phone. Needs internet on both phones.
+
+```sh
+npm run test:build6    # court screen, shootout, yard, rumble, CPU specials, keeper dive
+npm run test:friend    # two real game windows play a friend match (local link)
+```
+
 ## What's new in 1.5.0
 
 - **New look, everywhere:** a floodlight-broadcast skin over every menu (`css/broadcast.css`). Slab panels, Anton and Barlow type shipped with the game (works offline), spray pink and volt cyan accents, and the live 3D street drifting behind every pre-match screen.

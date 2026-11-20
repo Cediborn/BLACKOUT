@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v22';   // Build 5 — floodlight broadcast menus, logo, fonts, dusk/blackout, rain
+var CACHE_NAME = 'blackout-v23';   // Build 6 — court+conditions, shootout/yard/rumble, CPU specials, keeper dives, friend match
 var ASSETS = [
   './',
   './index.html',
@@ -76,6 +76,11 @@ var ASSETS = [
   './js/lighting.js',
   './js/weather.js',
   './js/match.js',
+  './js/aispecials.js',
+  './js/keepermotion.js',
+  './js/modectrl.js',
+  './js/net.js',
+  './lib/peerjs.min.js',
   './js/celebration.js',
   './js/goal-cinematic.js',
   './js/reactions.js',

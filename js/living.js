@@ -414,7 +414,7 @@ LG.Living = (function () {
       hideFigure(mv.idx);
       made++;
     }
-    if (lvl !== 'medium') fig.root.visible = false;
+    if (lvl !== 'medium') { fig.root.visible = false; fig._replaced = true; }
     flushFigures(fig);
   }
   // goal / save / miss reactions for the watchers
@@ -679,5 +679,24 @@ LG.Living = (function () {
     return out;
   }
 
-  return { build: build, update: update, folkPositions: folkPositions, cheer: cheer, info: info, traffic: trafficInfo, pathAt: function (s) { return pathAt(s, {}); }, pathLength: function () { if (!PATH) buildPath(); return PATH.len; } };
+  // Build 6: STREET LIFE level 0..1 — share of walkers, watchers, cars and
+  // bikes shown (0 = an empty street). Movers keep moving while hidden, so
+  // turning it back up never snaps anything.
+  function setLife(frac) {
+    frac = Math.max(0, Math.min(1, frac));
+    var nPed = 0, nCar = 0;
+    for (var i = 0; i < movers.length; i++) {
+      var mv = movers[i];
+      var h = ((i * 2654435761) >>> 0) / 4294967296;     // stable per mover
+      var on = h < frac || (frac >= 0.999);
+      if (mv.g) mv.g.visible = on;
+      if (mv.folk && mv.folk.m && mv.folk.m.group) mv.folk.m.group.visible = on;
+      if (mv.kind === 'ped' || mv.kind === 'watcher') { mv.hidden = !on; if (on) nPed++; }
+      else if (on) nCar++;
+    }
+    if (fig && fig.root) fig.root.visible = frac > 0 && !fig._replaced;
+    return { people: nPed, vehicles: nCar };
+  }
+
+  return { setLife: setLife, build: build, update: update, folkPositions: folkPositions, cheer: cheer, info: info, traffic: trafficInfo, pathAt: function (s) { return pathAt(s, {}); }, pathLength: function () { if (!PATH) buildPath(); return PATH.len; } };
 })();

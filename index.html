@@ -60,6 +60,37 @@
 
   <div id="mode-chip" class="hidden"></div>
 
+  <!-- Build 6: in-match HUD for the shootout, the yard and rumble -->
+  <div id="mode-hud" class="hidden">
+    <div id="so-hud" class="so-hud hidden">
+      <div class="so-board">
+        <div class="so-row"><span class="so-who">YOU</span><span class="so-dots" id="so-dots-0"></span></div>
+        <div class="so-row"><span class="so-who so-cpu">CPU</span><span class="so-dots" id="so-dots-1"></span></div>
+      </div>
+      <div class="so-score" id="so-score">0 – 0</div>
+      <div class="so-bottom">
+        <div class="so-prompt" id="so-prompt"></div>
+        <div class="so-dive" id="so-dive"></div>
+        <div class="so-power" id="so-power"><i id="so-power-fill"></i><b class="so-sweet"></b></div>
+      </div>
+    </div>
+    <div id="yard-hud" class="yard-hud hidden">
+      <div class="yard-card">
+        <div class="yard-k" id="yard-k">THE YARD</div>
+        <div class="yard-name" id="yard-name"></div>
+        <div class="yard-how" id="yard-how"></div>
+      </div>
+      <div class="yard-side">
+        <div class="yard-clock" id="yard-clock">0:40</div>
+        <div class="yard-meta"><div class="yard-score" id="yard-score">SCORE 0</div><div class="yard-stars" id="yard-stars"></div></div>
+        <div class="yard-next" id="yard-next"></div>
+      </div>
+    </div>
+    <div id="rumble-hud" class="rumble-hud hidden">
+      <span class="rumble-tag">RUMBLE</span><span id="rumble-last"></span>
+    </div>
+  </div>
+
   <div id="scoreboard" class="hidden sb-bug">
     <div class="team home">
       <span class="label" id="home-label">HOME</span>
@@ -151,12 +182,45 @@
 
       <nav id="hub-nav" class="hub-nav" aria-label="Main">
         <button id="btn-profile" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>PROFILE</button>
+        <button id="btn-friend" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3.2"/><circle cx="16.5" cy="9" r="3.2"/><path d="M2.5 20c.8-3.4 3-5 5.5-5s4.7 1.6 5.5 5M11.5 20c.8-3.4 2.7-5 5-5 2.5 0 4.4 1.6 5 5"/></svg>FRIEND MATCH</button>
         <button id="btn-challenges" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 16.6 6.7 19.5l1.1-6L3.4 9.3l6-.8z"/></svg>CHALLENGES</button>
         <button id="btn-how" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 0c0 2-2.5 2-2.5 4M12 17h.01"/></svg>HOW TO PLAY</button>
         <button id="btn-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>SETTINGS</button>
         <button id="btn-about" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>ABOUT</button>
-        <span class="menu-version" id="menu-version">v1.5.0</span>
+        <span class="menu-version" id="menu-version">v1.6.0</span>
       </nav>
+    </div>
+  </div>
+
+  <!-- Build 6: FRIEND MATCH — host gets a code, the friend joins with it -->
+  <div id="friend-overlay" class="overlay hidden">
+    <div class="panel friend-panel">
+      <div class="friend-head">
+        <div class="title-xl" style="font-size:clamp(24px,6vmin,44px)"><span class="t1">FRIEND</span> <span class="t2">MATCH</span></div>
+        <span class="friend-strap">3V3 · YOU VS A FRIEND · ONLINE</span>
+      </div>
+      <div class="friend-you" id="friend-you"></div>
+      <div class="friend-cols">
+        <div class="friend-card friend-host">
+          <div class="friend-k">HOST A MATCH</div>
+          <div class="friend-p">Create a code and send it to your friend. Your court, time and weather are used.</div>
+          <div class="friend-code" id="friend-code" aria-live="polite"></div>
+          <div class="friend-btns">
+            <button id="btn-friend-host" class="big-btn" type="button">CREATE CODE</button>
+            <button id="btn-friend-copy" class="big-btn secondary" type="button">COPY</button>
+          </div>
+          <div class="friend-status" id="friend-host-status" role="status"></div>
+        </div>
+        <div class="friend-card friend-join">
+          <div class="friend-k">JOIN A FRIEND</div>
+          <label class="friend-p" for="friend-input">Type the 6-character code your friend sent you.</label>
+          <input id="friend-input" class="friend-input" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7Q2XM">
+          <button id="btn-friend-join" class="big-btn gold" type="button">JOIN MATCH</button>
+          <div class="friend-status" id="friend-join-status" role="status"></div>
+        </div>
+      </div>
+      <div class="friend-foot">Needs an internet connection on both phones and the same game version. The code only finds your friend; the match then runs phone to phone.</div>
+      <div class="row-btns nav-btns"><button id="btn-friend-back" class="big-btn secondary" type="button">BACK</button></div>
     </div>
   </div>
 
@@ -329,25 +393,27 @@
 
   <!-- 4. Court selection -->
   <div id="court-overlay" class="overlay hidden">
-    <div class="panel">
-      <div class="title-xl" style="font-size:clamp(24px,6vmin,44px)"><span class="t1">COURT</span> <span class="t2">SELECTION</span></div>
-      <div id="court-grid" class="court-grid"></div>
-      <div class="row-btns nav-btns">
-        <button id="btn-court-back" class="big-btn secondary">BACK</button>
-        <button id="btn-court-go" class="big-btn gold">CONTINUE</button>
+    <div class="panel court-panel">
+      <div class="court-main">
+        <div class="court-head">
+          <div class="title-xl" style="font-size:clamp(24px,6vmin,44px)"><span class="t1">COURTS</span></div>
+          <span class="court-count" id="court-count">GROUNDS</span>
+        </div>
+        <div id="court-grid" class="court-grid"></div>
+        <div class="court-sel">
+          <div class="court-sel-k">SELECTED</div>
+          <div class="court-sel-name" id="court-sel-name">CLASSIC</div>
+        </div>
+        <div class="court-effect">
+          <div class="court-effect-k">WHAT CHANGES ON THE PITCH</div>
+          <div class="court-effect-t" id="court-effect">Floodlights on.</div>
+        </div>
       </div>
-    </div>
-  </div>
-
-  <!-- 5. Match setup (presentation only) -->
-  <div id="setup-overlay" class="overlay hidden">
-    <div class="panel">
-      <div class="title-xl" style="font-size:clamp(26px,6.4vmin,50px)"><span class="t1">MATCH</span> <span class="t2">SETUP</span></div>
-      <div class="setup-note" id="setup-note">BLACKOUT: the floodlights fail. Headlights, festoons and windows light the court.</div>
-      <div class="option-groups setup-groups">
+      <div class="court-cond" aria-label="Conditions">
+        <div class="court-cond-title">CONDITIONS</div>
         <div class="option-group">
           <div class="option-label">TIME OF DAY</div>
-          <div class="option-row">
+          <div class="option-row cond-row" role="group" aria-label="Time of day">
             <button class="option-btn selected" id="time-day">DAY</button>
             <button class="option-btn" id="time-dusk">DUSK</button>
             <button class="option-btn" id="time-night">NIGHT</button>
@@ -356,11 +422,45 @@
         </div>
         <div class="option-group">
           <div class="option-label">WEATHER</div>
-          <div class="option-row">
+          <div class="option-row cond-row" role="group" aria-label="Weather">
             <button class="option-btn selected" id="weather-dry">DRY</button>
             <button class="option-btn" id="weather-rain">RAIN</button>
+            <button class="option-btn" id="weather-fog">FOG</button>
+            <button class="option-btn" id="weather-wind">WIND</button>
           </div>
         </div>
+        <div class="option-group">
+          <div class="option-label">CROWD</div>
+          <div class="option-row cond-row" role="group" aria-label="Crowd">
+            <button class="option-btn" id="crowd-empty">EMPTY</button>
+            <button class="option-btn" id="crowd-locals">LOCALS</button>
+            <button class="option-btn" id="crowd-busy">BUSY</button>
+            <button class="option-btn selected" id="crowd-packed">PACKED</button>
+          </div>
+        </div>
+        <div class="option-group">
+          <div class="option-label">STREET LIFE</div>
+          <div class="option-row cond-row" role="group" aria-label="Street life">
+            <button class="option-btn" id="life-off">OFF</button>
+            <button class="option-btn" id="life-low">LOW</button>
+            <button class="option-btn" id="life-med">MED</button>
+            <button class="option-btn selected" id="life-full">FULL</button>
+          </div>
+        </div>
+        <div class="row-btns nav-btns court-nav">
+          <button id="btn-court-back" class="big-btn secondary">BACK</button>
+          <button id="btn-court-go" class="big-btn gold">USE THIS COURT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Match setup (presentation only) -->
+  <div id="setup-overlay" class="overlay hidden">
+    <div class="panel">
+      <div class="title-xl" style="font-size:clamp(26px,6.4vmin,50px)"><span class="t1">MATCH</span> <span class="t2">SETUP</span></div>
+      <div class="setup-note" id="setup-note"></div>
+      <div class="option-groups setup-groups">
         <div class="option-group">
           <div class="option-label">GAME VIEW</div>
           <div class="option-row">
@@ -525,7 +625,7 @@
         <div class="help-section" data-about="about">
           <div class="help-section-title">ABOUT</div>
           <div class="help-row"><span class="help-key">GAME</span><span class="help-desc">BLACKOUT is a 3V3 street football game with goalkeepers — quick matches, focused challenges and a four-team Street Cup.</span></div>
-          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.5.0</b></span></div>
+          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.6.0</b></span></div>
           <div class="help-row"><span class="help-key">RUN</span><span class="help-desc">Plays fully offline after the first load. No account, no server, no purchases.</span></div>
         </div>
         <div class="help-section" data-about="credits">
@@ -536,6 +636,7 @@
           <div class="help-row"><span class="help-key">MODEL</span><span class="help-desc">"Soap Soccer Player" by luccacatalan (Sketchfab), licensed CC BY 4.0 — base mesh for every player</span></div>
           <div class="help-row"><span class="help-key">SFX</span><span class="help-desc">Procedural Web Audio — every sound effect and the crowd are generated in code</span></div>
           <div class="help-row"><span class="help-key">MUSIC</span><span class="help-desc">Menu tracks created with Google generative AI (marked by embedded Content Credentials)</span></div>
+          <div class="help-row"><span class="help-key">ONLINE</span><span class="help-desc">PeerJS 1.5.5 (MIT, Michelle Bu &amp; Eric Zhang) and the free PeerJS broker, used only to swap the friend-match code — see lib/peerjs.LICENSE</span></div>
           <div class="help-row"><span class="help-key">FONTS</span><span class="help-desc">Anton (The Anton Project Authors) and Barlow / Barlow Condensed (The Barlow Project Authors), SIL Open Font License 1.1 — see fonts/OFL.txt</span></div>
           <div class="help-row"><span class="help-key">ART</span><span class="help-desc">Court art, murals and UI treatment created for this project</span></div>
           <div class="help-row"><span class="help-key">CODE</span><span class="help-desc">Gameplay, AI, progression and UI written for BLACKOUT</span></div>
@@ -659,7 +760,7 @@
       <div class="result-score"><span class="rs" id="res-home">3</span> : <span class="ra" id="res-away">1</span></div>
       <table class="match-stats" id="match-stats" aria-label="Match statistics">
         <thead>
-          <tr><th></th><th>YOU</th><th>ROGUE</th></tr>
+          <tr><th></th><th>YOU</th><th id="ms-away-name">ROGUE</th></tr>
         </thead>
         <tbody>
           <tr><td>GOALS</td><td id="st-h-g">0</td><td id="st-a-g">0</td></tr>
@@ -673,6 +774,7 @@
       </table>
       <div class="result-coins" id="res-coins"><span class="coin"></span><span id="res-coins-n">+0</span></div>
       <div id="res-coin-lines" class="res-coin-lines" aria-label="How the coins were earned"></div>
+      <div id="res-summary" class="res-summary hidden"></div>
       <div class="result-challenges" id="res-challenges">
         <div class="help-section-title">CHALLENGES</div>
         <ul id="res-ch-list" class="profile-history" aria-label="Completed challenges"></ul>
@@ -699,7 +801,7 @@
     if (window.THREE && THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 
     // Single early version stamp so a failed boot still shows a real number.
-    window.BLOCKOUT_VERSION = '1.5.0';
+    window.BLOCKOUT_VERSION = '1.6.0';
     window.addEventListener('error', function (e) {
       try {
         var box = document.getElementById('loading-error');
@@ -754,6 +856,10 @@
   <script src="js/lighting.js"></script>
   <script src="js/weather.js"></script>
   <script src="js/match.js"></script>
+  <script src="js/aispecials.js"></script>
+  <script src="js/keepermotion.js"></script>
+  <script src="js/modectrl.js"></script>
+  <script src="js/net.js"></script>
   <script src="js/celebration.js"></script>
   <script src="js/goal-cinematic.js"></script>
   <script src="js/reactions.js"></script>

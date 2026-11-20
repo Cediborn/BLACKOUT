@@ -147,8 +147,10 @@ LG.HUD = (function () {
   var spLast = { name: null, fill: -1, border: null };
   function updateSpecial(activePlayer) {
     if (!activePlayer) return;
-    var def = LG.Abilities[activePlayer.def.ability];
-    if (spLast.name !== def.name) { spLast.name = def.name; specialName.textContent = def.name; }
+    // Build 6: a Rumble orb's ability shows over the player's own
+    var def = LG.Abilities[activePlayer._rumbleAbility || (activePlayer.active && activePlayer.active.id) || activePlayer.def.ability];
+    if (!def) return;
+    if (spLast.name !== def.label) { spLast.name = def.label; specialName.textContent = def.label; }
     specialBtn.classList.toggle('ready', activePlayer.meterFull && !activePlayer.active);
     specialBtn.classList.toggle('active', !!activePlayer.active);
     var fill = Math.round(activePlayer.meter * 100);

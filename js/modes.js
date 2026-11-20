@@ -43,6 +43,28 @@ LG.Modes = (function () {
       type: 'quick',
       rules: { twist: 'daily' },
     },
+    // ---- Build 6 ----
+    {
+      id: 'penalty_shootout',
+      name: 'PENALTY SHOOTOUT',
+      blurb: 'Five kicks each, then sudden death. Aim, charge, shoot — then pick your dive.',
+      type: 'quick',
+      rules: {},
+    },
+    {
+      id: 'the_yard',
+      name: 'THE YARD',
+      blurb: 'Training: target practice, speed gates, pass & move. Three stars per drill; new stars pay coins.',
+      type: 'practice',
+      rules: {},
+    },
+    {
+      id: 'rumble',
+      name: 'RUMBLE',
+      blurb: 'A full match where specials only come from orbs. Run over one to grab any of the 8 abilities.',
+      type: 'quick',
+      rules: {},
+    },
   ];
 
   var byIdMap = {};

@@ -41,7 +41,7 @@ module.exports = async function (page) {
   // ---- the setup flow ----
   await click('btn-play'); await page.wait(500);
   check(await visible('mode-overlay'), 'KICK OFF opens the modes');
-  check(await page.eval("document.querySelectorAll('#mode-list .mode-soon').length >= 1"), 'coming-soon modes are shown but cannot be picked');
+  check(await page.eval("document.querySelectorAll('#mode-list .mode-card:not(.mode-soon)').length === 8"), 'all 8 modes are playable (Build 6)');
   await page.shot('m02_modes');
   await click('btn-mode-go'); await page.wait(500);
   await page.shot('m03_difficulty');

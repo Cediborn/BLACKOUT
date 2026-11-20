@@ -10,7 +10,9 @@ LG.Settings = (function () {
   var KEY = 'blockout.settings.v1';
   var data = {
     timeOfDay: 'day',     // 'day' | 'dusk' | 'night' | 'blackout'  (day is the baseline)
-    weather: 'dry',       // 'dry' | 'rain'  (Build 5)
+    weather: 'dry',       // 'dry' | 'rain' | 'fog' | 'wind'  (Build 5/6)
+    crowd: 'packed',      // 'empty' | 'locals' | 'busy' | 'packed'  (Build 6)
+    life: 'full',         // 'off' | 'low' | 'med' | 'full'  (Build 6)
     view: 'landscape',    // 'portrait' | 'landscape' (existing mobile default was landscape)
     volMaster: 0.55,      // 0..1 — historical master gain default
     volSfx: 1,            // 0..1 — procedural blips / kicks / whistle
@@ -21,7 +23,9 @@ LG.Settings = (function () {
   };
 
   var TIME = ['day', 'dusk', 'night', 'blackout'];
-  var WEATHER = ['dry', 'rain'];
+  var WEATHER = ['dry', 'rain', 'fog', 'wind'];
+  var CROWD = ['empty', 'locals', 'busy', 'packed'];
+  var LIFE = ['off', 'low', 'med', 'full'];
   var VIEW = ['portrait', 'landscape'];
   var QUALITY = ['auto', 'low', 'medium', 'high'];
 
@@ -39,6 +43,8 @@ LG.Settings = (function () {
         if (TIME.indexOf(p.timeOfDay) >= 0) data.timeOfDay = p.timeOfDay;
         if (VIEW.indexOf(p.view) >= 0) data.view = p.view;
         if (WEATHER.indexOf(p.weather) >= 0) data.weather = p.weather;
+        if (CROWD.indexOf(p.crowd) >= 0) data.crowd = p.crowd;
+        if (LIFE.indexOf(p.life) >= 0) data.life = p.life;
         if (p.volMaster !== undefined) data.volMaster = num01(p.volMaster, data.volMaster);
         if (p.volSfx !== undefined) data.volSfx = num01(p.volSfx, data.volSfx);
         if (p.volCrowd !== undefined) data.volCrowd = num01(p.volCrowd, data.volCrowd);
@@ -80,6 +86,13 @@ LG.Settings = (function () {
       data.weather = w; save();
       return data.weather;
     },
+    crowd: function () { return data.crowd; },
+    setCrowd: function (c) { if (CROWD.indexOf(c) >= 0) { data.crowd = c; save(); } return data.crowd; },
+    // share of the stands filled for each crowd level
+    crowdFrac: function () { return { empty: 0, locals: 0.3, busy: 0.7, packed: 1 }[data.crowd]; },
+    life: function () { return data.life; },
+    setLife: function (l) { if (LIFE.indexOf(l) >= 0) { data.life = l; save(); } return data.life; },
+    lifeFrac: function () { return { off: 0, low: 0.35, med: 0.7, full: 1 }[data.life]; },
     view: function () { return data.view; },
     setView: function (m) {
       if (VIEW.indexOf(m) < 0) return data.view;
@@ -143,6 +156,8 @@ LG.Settings = (function () {
       return {
         timeOfDay: data.timeOfDay,
         weather: data.weather,
+        crowd: data.crowd,
+        life: data.life,
         view: data.view,
         volMaster: data.volMaster,
         volSfx: data.volSfx,

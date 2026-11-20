@@ -102,7 +102,8 @@ server.listen(0, '127.0.0.1', async function () {
   var url = 'http://127.0.0.1:' + port + '/index.html' + (QUERY ? '?' + QUERY : '');
   var cmd = ['--headless=new', '--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--hide-scrollbars', '--mute-audio', '--no-first-run', '--disable-extensions', '--disable-background-networking',
-    '--autoplay-policy=no-user-gesture-required', '--user-data-dir=' + profile,
+    '--autoplay-policy=no-user-gesture-required',
+    '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--user-data-dir=' + profile,
     '--window-size=' + SIZE[0] + ',' + SIZE[1], '--remote-debugging-port=' + dbg, url];
   if (process.getuid && process.getuid() === 0) cmd.unshift('--no-sandbox');
   var proc = child.spawn(CHROME, cmd, { stdio: ['ignore', 'ignore', 'ignore'] });
@@ -119,6 +120,8 @@ server.listen(0, '127.0.0.1', async function () {
     }
     if (!target) throw new Error('chrome did not come up');
     var cdp = await CDP(target.webSocketDebuggerUrl);
+    var pages = [];
+    async function attach(cdp, tag) {
     cdp.on(function (m) {
       if (m.method === 'Runtime.exceptionThrown') {
         var d = m.params.exceptionDetails;
@@ -127,7 +130,7 @@ server.listen(0, '127.0.0.1', async function () {
       } else if (m.method === 'Runtime.consoleAPICalled') {
         var txt = (m.params.args || []).map(function (a) { return a.value !== undefined ? a.value : (a.description || ''); }).join(' ');
         if (/^LOOK|^\[look\]|^\[ATH\]|FALLBACK/.test(txt)) console.log(txt);
-        if (m.params.type === 'error') { errors.push(txt); console.log('[console.error] ' + txt.slice(0, 300)); }
+        if (m.params.type === 'error') { errors.push(txt); console.log('[console.error] ' + tag + txt.slice(0, 300)); }
       }
     });
     await cdp.send('Page.enable');
@@ -162,11 +165,36 @@ server.listen(0, '127.0.0.1', async function () {
         console.log('[look] wrote ' + f);
         return f;
       },
-      log: function (m) { console.log('[look] ' + m); },
+      log: function (m) { console.log('[look] ' + tag + m); },
+      // a second tab of the same game (same browser, so BroadcastChannel
+      // links them) — used by the FRIEND MATCH check with ?net=bc
+      second: async function (query) {
+        var u = 'http://127.0.0.1:' + port + '/index.html' + (query ? '?' + query : '');
+        // a separate WINDOW, so both games keep rendering (a background tab
+        // in the same window gets no animation frames)
+        var ver = await (await fetch('http://127.0.0.1:' + dbg + '/json/version')).json();
+        var bro = await CDP(ver.webSocketDebuggerUrl);
+        var created = await bro.send('Target.createTarget', { url: u, newWindow: true, background: false });
+        var t = null;
+        for (var k = 0; k < 40 && !t; k++) {
+          await sleep(200);
+          var ls = await (await fetch('http://127.0.0.1:' + dbg + '/json/list')).json();
+          t = ls.filter(function (x) { return x.id === created.targetId; })[0];
+        }
+        var c2 = await CDP(t.webSocketDebuggerUrl);
+        pages.push(bro);
+        var p2 = await attach(c2, '[B] ');
+        await p2.until("!!(window.LG && window.LGMain && LGMain.getState && document.getElementById('loading-overlay').classList.contains('hidden'))", 90000);
+        return p2;
+      },
     };
+    pages.push(cdp);
+    return page;
+    }
+    var page = await attach(cdp, '');
     await page.until("!!(window.LG && window.LGMain && LGMain.getState && document.getElementById('loading-overlay').classList.contains('hidden'))", 90000);
     await require(SCRIPT)(page);
-    cdp.close();
+    pages.forEach(function (c) { try { c.close(); } catch (e) {} });
   } catch (e) {
     console.log('[look] FAILED: ' + e.message);
     exitCode = 1;

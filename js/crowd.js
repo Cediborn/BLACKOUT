@@ -595,7 +595,25 @@ LG.Crowd = (function () {
     }
   }
 
+  // Build 6: CROWD density 0..1 — every instanced body part draws the same
+  // first N spectators, so whole people disappear, never half of one.
+  function setDensity(frac) {
+    if (!root) return 0;
+    frac = Math.max(0, Math.min(1, frac));
+    root.visible = frac > 0;
+    var shown = 0;
+    root.traverse(function (o) {
+      if (o.isInstancedMesh) {
+        if (o.userData._full == null) o.userData._full = o.count;
+        o.count = Math.round(o.userData._full * frac);
+        shown = Math.max(shown, o.count);
+      }
+    });
+    return shown;
+  }
+
   return {
+    setDensity: setDensity,
     begin: begin,
     put: put,
     build: build,

@@ -8,6 +8,7 @@ abilities: nothing here grants gameplay stats.
 | Soccer player rig | `3d/soap_soccer_player.glb` | `js/realplayer.js`, `js/models.js` | CC-BY-4.0 | luccacatalan (Sketchfab) |
 | Athlete body + 37 clips | `3d/athlete.glb` | `js/athlete.js` | CC0-1.0 | Quaternius — Universal Animation Library 1 + 2 |
 | Fonts: Anton, Barlow, Barlow Condensed (7 × woff2, Latin) | `fonts/*.woff2` | `css/broadcast.css` | SIL OFL 1.1 (`fonts/OFL.txt`) | The Anton Project Authors; The Barlow Project Authors (via @fontsource on npm) |
+| PeerJS 1.5.5 (WebRTC helper) | `lib/peerjs.min.js` | `js/net.js` (loaded only when FRIEND MATCH is used) | MIT (`lib/peerjs.LICENSE`) | Michelle Bu, Eric Zhang (npm `peerjs`) |
 | Menu music (5 tracks) | `audio/menu/*.mp3` | `js/menu-music.js` | See note below | Google generative AI |
 
 ## Generated in code (Build 3, no new files)
@@ -66,6 +67,13 @@ abilities: nothing here grants gameplay stats.
   lighting presets (`js/lighting.js`) are generated in code; no new files.
 - **Fonts**: see the table above. Shipped locally and cached by the service
   worker, so the game still works offline.
+
+## Build 6 (modes, keepers, friend match)
+
+- Penalty Shootout, The Yard (cones, targets, rings), Rumble orbs, keeper
+  dives/jumps and the fog and wind effects are generated in code; no new art files.
+- FRIEND MATCH uses the free public PeerJS broker (0.peerjs.com) only to
+  exchange the 6-character code; match data then goes phone to phone.
 
 ## Custom / original content (no third-party licence)
 

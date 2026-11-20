@@ -1980,7 +1980,7 @@ section('17. game modes + tournament (pure, once-only, no RNG)');
 (function () {
   var M = LG.Modes;
   var T = LG.Tournament;
-  assert(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 5), 'five modes registered');
+  assert(!!(M && Array.isArray(M.DEFS) && M.DEFS.length === 8), 'eight modes registered (Build 6)');
   assert(M.is('quick_match'), 'default mode is quick_match', M.id());
   assert(M.select('tournament') === 'tournament' && M.is('tournament'), 'select switches mode');
   assert(M.select('nope') === 'tournament', 'unknown mode ids are refused', M.id());
@@ -2348,6 +2348,50 @@ section('24. street twist — bends Config for one match, always restores it');
   var normal = newMatch('blaze');
   assert(Math.abs(normal.home[0].maxSpeed - base) < 1e-9 && Math.abs(normal.ball.r - r0) < 1e-9, 'a normal match after a twist is untouched');
   assert(LG.Modes.applyTwist(null) === null && LG.Modes.applyTwist('nope') === null, 'no twist or an unknown twist applies nothing');
+})();
+
+// ============================================================
+section('Build 6. the CPU side fires its special moves');
+(function () {
+  load('js/aispecials.js');
+  var A = LG.AISpecials;
+  // each ability recognises its own moment
+  var m = newMatch('blaze');
+  m.start(); m.state = 'PLAY';
+  var cpu = m.away.filter(function (p) { return !p.isGoalkeeper; })[0];
+  var me = m.active;
+  var hl = LG.Config.court.length / 2;
+  place(cpu, 0, -hl + 6); place(me, 0, -hl + 7.2);   // the CPU defends the -z goal
+  giveBall(m, me);
+  assert(A.moment(m, cpu, 'SUPER_TACKLE'), 'BLOCKBUSTER fires when the carrier is close');
+  assert(A.moment(m, cpu, 'FREEZE'), 'ICE GRIP fires when they bear down on goal');
+  place(me, 0, 14);
+  assert(!A.moment(m, cpu, 'SUPER_TACKLE'), 'no BLOCKBUSTER when the carrier is far away');
+  giveBall(m, cpu); place(cpu, 0, 8);   // attacking +z
+  m.home.forEach(function (p) { if (!p.isGoalkeeper) place(p, 12, -12); });
+  assert(A.moment(m, cpu, 'POWER_SHOT'), 'POWER SHOT fires in range of goal');
+  place(cpu, 0, -6);
+  assert(A.moment(m, cpu, 'BURST'), 'BURST fires with space ahead');
+  // over a stretch of real play, the CPU really uses its moves (every level)
+  ['easy', 'medium', 'hard'].forEach(function (lvl) {
+    LG.Difficulty.set(lvl);
+    var used = 0, mine = 0;
+    for (var g = 0; g < 3; g++) {
+      var mm = newMatch('blaze');
+      mm.bus.on('abilityActivated', function (p) { if (p.team === 1) used++; else mine++; });
+      mm.start();
+      mm.away.forEach(function (p) { p.fillMeter(1); });
+      var t = { t: 0 };
+      for (var i = 0; i < 60 * 40; i++) {
+        step(mm, 1 / 60, t);
+        if (mm.state === 'END') break;
+        if (i % 600 === 0) mm.away.forEach(function (p) { if (!p.isGoalkeeper) p.fillMeter(1); });
+      }
+    }
+    assert(used >= 2, lvl + ': the CPU fired special moves in play', used);
+    assert(mine === 0, lvl + ': it never fires the human side\'s moves', mine);
+  });
+  LG.Difficulty.set('medium');
 })();
 
 // ============================================================
