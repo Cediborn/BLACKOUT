@@ -79,6 +79,9 @@ module.exports = async function (A) {
   await A.eval("LGMain.getMatch().endMatch(); true");
   await A.until("LGMain.getState() === 'result'", 60000);
   await B.until("LGMain.getState() === 'result'", 60000);
+  // the results board fills in a beat after full time
+  await A.until("!document.getElementById('result-overlay').classList.contains('hidden')", 30000);
+  await B.until("!document.getElementById('result-overlay').classList.contains('hidden')", 30000);
   var rA = await A.eval("document.getElementById('result-title').textContent");
   var rB = await B.eval("document.getElementById('result-title').textContent");
   check(/BEAT/.test(rA) && /FRIEND WON/.test(rB), 'full time on both: ' + rA + ' / ' + rB);

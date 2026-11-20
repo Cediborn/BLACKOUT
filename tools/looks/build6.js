@@ -53,7 +53,7 @@ module.exports = async function (page) {
     if (s.p === 'aim') { await page.eval("var c=LGMain.getMatch().ctrl; c.shoot(LGMain.getMatch(), 0.8, 2.0, 1.4); true"); await sim(1.5); }
     else await sim(1.0);
   }
-  await page.until("LGMain.getState() === 'result'", 20000).catch(function () {});
+  await page.until("/SHOOTOUT/.test(document.getElementById('result-title').textContent) && !document.getElementById('result-overlay').classList.contains('hidden')", 30000).catch(function () {});
   var so = await J("{ st: LGMain.getState(), t: document.getElementById('result-title').textContent, sum: document.querySelectorAll('#res-summary .rs-line').length }");
   check(so.st === 'result' && /SHOOTOUT/.test(so.t) && so.sum === 2, 'the shootout reaches a result with both kick records ' + JSON.stringify(so));
   await click('btn-result-menu'); await page.wait(300);
@@ -70,7 +70,8 @@ module.exports = async function (page) {
   await sim(41);
   check(await page.eval("LGMain.getMatch().ctrl.d === 2 && !!LGMain.getMatch().ctrl.lit"), 'PASS & MOVE follows with a lit mate');
   await sim(42);
-  await page.until("LGMain.getState() === 'result'", 20000).catch(function () {});
+  // the results board fills in a beat after full time
+  await page.until("/TRAINING/.test(document.getElementById('result-title').textContent) && !document.getElementById('result-overlay').classList.contains('hidden')", 30000).catch(function () {});
   check(/TRAINING/.test(await page.eval("document.getElementById('result-title').textContent")) && (await page.eval("document.querySelectorAll('#res-summary .rs-line').length")) === 3, 'THE YARD lists all three drills at the end');
   check(await page.eval("!!LG.ModeCtrl.yardBest().targets"), 'drill bests are saved on the device');
   await click('btn-result-menu'); await page.wait(300);
