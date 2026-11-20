@@ -32,6 +32,19 @@ To film every menu and check the Build 5 screens (also part of `npm test`):
 node tools/look.js tools/looks/menus.js --out looks-out/build5
 ```
 
+## What's new in 1.8.0
+
+- **Goalkeepers that keep goal:** keepers now narrow the angle (off the line as an attacker comes on, tucked in at the near post when the ball is wide), shuffle across facing the ball, sprint back when pulled out of position, claim loose balls and through passes they can genuinely reach first, and come off the line to smother a striker who is through. Shots get a short, level-dependent reaction delay and a committed read, so placed shots, close finishes and wrong-footed keepers still beat them. The ROGUE keeper no longer wanders off his line or lets balls go round him.
+- **Calm, protected distribution:** a keeper who catches or gathers the ball secures it, looks up, walks it to a release spot and then rolls, throws or kicks it to the best open teammate, or clears it when every outlet is marked. While he holds it he cannot be tackled or bumped, and opponents (yours included) are eased out of a bubble around him. Loose balls and parries are still fair game.
+- **A ROGUE side that attacks:** CPU carriers rate their chance (angle, distance, the gap the keeper leaves, bodies on the line) before shooting, aim for a corner, square it to a team-mate with a better chance, and carry the ball into better spots. Runners attack the far post and arrive at the edge of the box. Difficulty still sets appetite and accuracy; EASY rarely threatens, HARD keeps you busy.
+- **Goals only when they are goals:** the goal is now a physical object: posts and crossbar you can hit, soft side, roof and back nets, and a real end fence (with a panel over the bar). A goal is the whole ball over the line inside the frame, counted once. Side netting, the outside of the goal, the woodwork, balls over the bar and a dribble into the netting beside the post can no longer score. Fast shots are swept in short steps so they can't tunnel through a post, and a ball in the net stays in the net (which ripples).
+- **A bigger cage:** the court grows from 26 x 44 to 30 x 50. Fences, stands, benches, lights and street life moved with it, and the AI, kick-off shape and cameras all scale to the new size.
+
+```sh
+npm run test:build8    # the cage, the nets, goal detection, keeper possession in the real game
+node tools/sim.js      # sections "Build 8a"–"Build 8e": goal line, keepers, possession, attack, court
+```
+
 ## What's new in 1.7.0
 
 - **Faster, snappier play on phones:** quicker kick-offs, sharper acceleration and turning, and a slightly higher top pace (passes and shots kept their tuned speeds). A slow phone no longer plays in slow motion: the match clock stays real-time even at 20 fps. The stadium is batched (about 240 fewer draw calls a frame), phones render at 1.5x instead of 2x, and the resolution steps down on its own when a frame runs long.

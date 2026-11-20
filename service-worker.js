@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v24';   // Build 7 — speed/perf, smooth online sync, 5 cameras, skill moves, postprocessing
+var CACHE_NAME = 'blackout-v25';   // Build 8 — keeper AI + possession, ROGUE attack, physical goal + net, 30x50 court
 var ASSETS = [
   './',
   './index.html',

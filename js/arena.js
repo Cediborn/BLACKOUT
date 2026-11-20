@@ -123,8 +123,10 @@ LG.Arena = (function () {
       }
     });
 
-    // south sidewalk (court fence z=22 to road z=35)
-    var southW = 26, southD = 13;
+    // south sidewalk (court fence z=L/2 to road z=35). Build 8: the road
+    // ring never moved, so the bigger cage simply eats into the pavement
+    var ROAD_Z = 35, ROAD_X = 30;
+    var southW = C.width, southD = ROAD_Z - C.length / 2;
     var walkS = new THREE.Mesh(new THREE.PlaneGeometry(southW + 2, southD), new THREE.MeshLambertMaterial({ map: walkT }));
     walkS.rotation.x = -Math.PI / 2;
     walkS.position.set(0, 0.005, C.length / 2 + southD / 2);
@@ -136,8 +138,8 @@ LG.Arena = (function () {
     walkN.position.z = -(C.length / 2 + southD / 2);
     g.add(walkN);
 
-    // east sidewalk (court fence x=13 to road x=30)
-    var sideW = 17, sideL = C.length + southD * 2;
+    // east sidewalk (court fence x=W/2 to road x=30)
+    var sideW = ROAD_X - C.width / 2, sideL = C.length + southD * 2;
     var walkE = new THREE.Mesh(new THREE.PlaneGeometry(sideW, sideL), new THREE.MeshLambertMaterial({ map: walkT }));
     walkE.rotation.x = -Math.PI / 2;
     walkE.position.set(C.width / 2 + sideW / 2, 0.005, 0);
@@ -388,6 +390,55 @@ LG.Arena = (function () {
       g.add(rail);
     }
     return g;
+  }
+
+  // Build 8: the fence panel above a goal mouth (crossbar to fence top)
+  function fenceHeader(z) {
+    var postM = new THREE.MeshStandardMaterial({ color: 0x39424f, roughness: 0.7, metalness: 0.4 });
+    var g = new THREE.Group();
+    var w = C.goalWidth + 0.3, y0 = C.goalHeight + 0.12, h = C.fenceHeight - y0;
+    if (h < 0.2) return g;
+    var p = LG.Models.fencePanel(w, h);
+    p.position.set(0, y0, z);
+    g.add(p);
+    g.add(LG.Models.bar(postM, 0, y0, z, 0.09, w));
+    g.add(LG.Models.bar(postM, 0, C.fenceHeight - 0.05, z, 0.09, w));
+    return g;
+  }
+
+  // Build 8: a ball into the net ripples the panel it hit (presentation only)
+  var ripples = [];
+  function bindNetRipple() {
+    if (bindNetRipple.done || !LG.eventBus || !LG.eventBus.on) return;
+    bindNetRipple.done = true;
+    LG.eventBus.on('netHit', function (e) {
+      if (!goalGroup || !e) return;
+      var goal = goalGroup.children[e.end > 0 ? 0 : 1];
+      var nets = goal && goal.userData && goal.userData.nets;
+      if (!nets) return;
+      var key = e.part === 'back' ? 'back' : e.part === 'roof' ? 'roof' : null;
+      if (e.part === 'side') {
+        // the south goal is turned round: its local left is world +x
+        var worldLeft = e.x < 0;
+        key = (e.end > 0 ? !worldLeft : worldLeft) ? 'sideL' : 'sideR';
+      }
+      var n = key && nets[key];
+      if (!n) return;
+      var amp = Math.min(0.22, 0.03 + e.speed * 0.008);
+      for (var i = 0; i < ripples.length; i++) if (ripples[i].n === n) { ripples[i].t = 0; ripples[i].amp = Math.max(ripples[i].amp, amp); return; }
+      ripples.push({ n: n, t: 0, amp: amp });
+    });
+  }
+  function updateRipples(dt) {
+    for (var i = ripples.length - 1; i >= 0; i--) {
+      var r = ripples[i];
+      r.t += dt;
+      var k = r.amp * Math.exp(-r.t * 5) * Math.cos(r.t * 18);
+      var o = r.n.o, b = r.n.base;
+      o.position.set(b.x, b.y, b.z);
+      o.position[r.n.axis] += r.n.sign * Math.max(-r.amp * 0.3, k);
+      if (r.t > 1.2) { o.position.set(b.x, b.y, b.z); ripples.splice(i, 1); }
+    }
   }
 
   // ---------------- goals ----------------
@@ -969,8 +1020,9 @@ LG.Arena = (function () {
     var g = new THREE.Group();
     var poleM = new THREE.MeshStandardMaterial({ color: 0x20242b, roughness: 0.6, metalness: 0.5 });
     var headM = new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff2c9, emissiveIntensity: 1.5 });
+    var lz = C.length / 2 + 4;   // Build 8: kept clear of the bigger cage
     var spots = [
-      { x: 9.2, z: -26 }, { x: -9.2, z: 26 },
+      { x: 9.2, z: -lz }, { x: -9.2, z: lz },
     ];
     for (var i = 0; i < spots.length; i++) {
       var s = spots[i];
@@ -996,11 +1048,12 @@ LG.Arena = (function () {
     var g = new THREE.Group();
     var woodM = new THREE.MeshStandardMaterial({ color: 0x6d4a2c, roughness: 0.9 });
     var legM = new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.8 });
+    var bz = C.length / 2 + 3;   // Build 8: benches stay 3 m behind the end fence
     var spots = [
-      { x: 11.6, z: 25, rot: 0 },
-      { x: -11.6, z: -25, rot: Math.PI },
-      { x: 11.6, z: -25, rot: Math.PI },
-      { x: -11.6, z: 25, rot: 0 },
+      { x: 11.6, z: bz, rot: 0 },
+      { x: -11.6, z: -bz, rot: Math.PI },
+      { x: 11.6, z: -bz, rot: Math.PI },
+      { x: -11.6, z: bz, rot: 0 },
       { x: 25, z: 10, rot: -Math.PI / 2 },
       { x: 25, z: -6, rot: -Math.PI / 2 },
       { x: -25, z: 10, rot: Math.PI / 2 },
@@ -1390,9 +1443,10 @@ LG.Arena = (function () {
     var towelM = new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.95 });
     var poleM = new THREE.MeshStandardMaterial({ color: 0x3a4050, roughness: 0.6, metalness: 0.4 });
 
+    var kx = C.width / 2 + 3.6, ks = C.length / 44;   // Build 8: courtside kit follows the fence
     var spots = [
-      { x: 16.6, z: 12 }, { x: 16.6, z: 19 },
-      { x: -16.6, z: 12 }, { x: -16.6, z: 19 },
+      { x: kx, z: 12 * ks }, { x: kx, z: 19 * ks },
+      { x: -kx, z: 12 * ks }, { x: -kx, z: 19 * ks },
     ];
     var flagSpot = (rnd() * spots.length) | 0;
     for (var s = 0; s < spots.length; s++) {
@@ -1503,11 +1557,19 @@ LG.Arena = (function () {
     var halfW = C.width / 2, halfL = C.length / 2;
     var gw = C.goalWidth / 2;
 
-    // fences around the court (goals leave open mouths)
-    root.add(fenceH([[ -halfW, halfW]], -halfL, [-gw - 0.15, gw + 0.15]));
-    root.add(fenceH([[ -halfW, halfW]], halfL, [-gw - 0.15, gw + 0.15]));
-    root.add(fenceV([[-halfL, halfL]], -halfW, null));
-    root.add(fenceV([[-halfL, halfL]], halfW, null));
+    // fences around the court (goals leave open mouths). Build 8: the end
+    // fence used to be ONE segment that overlapped the mouth's skip range,
+    // so it was never drawn at all — the ball bounced off an invisible wall
+    // beside the posts. It is now real panels either side of the goal plus a
+    // header panel above the crossbar: exactly the wall LG.GoalFrame uses.
+    var mouth = gw + 0.15;
+    var endSegs = [[-halfW, -halfW / 2], [-halfW / 2, -mouth], [mouth, halfW / 2], [halfW / 2, halfW]];
+    root.add(fenceH(endSegs, -halfL, null));
+    root.add(fenceH(endSegs, halfL, null));
+    root.add(fenceHeader(-halfL));
+    root.add(fenceHeader(halfL));
+    root.add(fenceV([[-halfL, -halfL / 3], [-halfL / 3, halfL / 3], [halfL / 3, halfL]], -halfW, null));
+    root.add(fenceV([[-halfL, -halfL / 3], [-halfL / 3, halfL / 3], [halfL / 3, halfL]], halfW, null));
 
     // Build 7: bake everything that never moves into a few draw calls
     // (the court surface swaps, trees sway, the crowd is instanced)
@@ -1564,6 +1626,8 @@ LG.Arena = (function () {
         applyGoalVisibility();
       },
       update: function (dt) {
+        bindNetRipple();
+        if (ripples.length) updateRipples(dt);
         // instanced crowd animates itself (12 phase groups); `anims` now
         // only carries the slow tree sway
         if (LG.Crowd) LG.Crowd.update(dt);

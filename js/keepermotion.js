@@ -84,10 +84,13 @@ LG.KeeperMotion = (function () {
       var s = sideOf(gk, m.ball.x, m.ball.z);
       if (s.lat > 0.5) start(gk, 'dive', { side: s.side, reach: 0.9 });
     });
+    // Build 8: the brain says HOW it restarts — a roll or a throw is
+    // delivered by hand (no kick swing), a long ball / clearance is kicked
     bus.on('keeperDistribute', function (e) {
       var gk = e && e.gk;
-      if (!gk || !e.target) return;
-      if (gk.distTo(e.target.x, e.target.z) < 12) { gk.kickAnim = 0; start(gk, 'throw'); }
+      if (!gk) return;
+      var byHand = e.kind ? (e.kind === 'roll' || e.kind === 'throw') : (e.target && gk.distTo(e.target.x, e.target.z) < 12);
+      if (byHand) { gk.kickAnim = 0; start(gk, 'throw'); }
     });
   }
 

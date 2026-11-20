@@ -4,16 +4,40 @@
 var LG = window.LG = window.LG || {};
 
 LG.Config = {
-  version: '1.7.0',
+  version: '1.8.0',
 
   court: {
-    width: 26,        // x extent (half = 13)
-    length: 44,       // z extent (half = 22)
-    goalWidth: 5.2,
-    goalDepth: 1.8,
-    goalHeight: 1.9,
+    // Build 8: the cage grew — 26x44 -> 30x50 (+15% wide, +14% long, ~31%
+    // more floor) so 3v3 has room to pass, dribble and attack. Everything
+    // that cares about the size reads it from here (or LG.Pitch below);
+    // the street ring outside (roads at |x|=30, |z|=35) did not move.
+    width: 30,        // x extent (half = 15)
+    length: 50,       // z extent (half = 25)
+    goalWidth: 5.2,   // post CENTRE to post centre
+    goalDepth: 1.8,   // goal line -> back net
+    goalHeight: 1.9,  // ground -> crossbar centre
     fenceHeight: 3.0,
     ballRadius: 0.27,
+  },
+
+  // Build 8 — the goal as a PHYSICAL object (js/ball.js LG.GoalFrame).
+  // The frame, the net and the scoring volume are separate things:
+  //   frame  = two post cylinders + a crossbar cylinder (hard, lively)
+  //   net    = side panels, roof and back panel of the pocket (soft: they
+  //            swallow the ball's pace instead of bouncing it out)
+  //   wall   = the cage's end fence either side of / above the mouth
+  //   volume = the box behind the line, inside the frame. A goal is ONLY
+  //            the whole ball beyond the line inside that box, having come
+  //            in through the mouth. Touching any net never scores.
+  goalFrame: {
+    postR: 0.07,        // post radius (matches the drawn post)
+    barR: 0.06,         // crossbar radius
+    netInset: 0.04,     // net panels hang this far inside the frame line
+    postBounce: 0.72,   // woodwork restitution (normal component kept)
+    netAbsorb: 0.12,    // net restitution: a net catches, it does not bounce
+    netFriction: 0.55,  // tangential speed kept after brushing a net panel
+    wallBounce: 0.48,   // end-fence restitution (same as the side fences)
+    subStep: 0.12,      // max ball travel (m) per collision sub-step
   },
 
   match: {
@@ -147,7 +171,7 @@ LG.Config = {
     keeperStandoff: 1.7,
     // while the keeper HOLDS the ball (post-save / distribution) every opponent
     // keeps this much clear air — the window where he is most vulnerable
-    keeperProtectR: 3.4,
+    keeperProtectR: 3.6,
     // PHASE 4.3 — anti-crowd bubbles used by AIBrain.separate(): mates keep
     // this far apart, and non-chasers keep this far from the free ball, so a
     // side holds its shape instead of collapsing into one scrum
@@ -221,6 +245,30 @@ LG.Config = {
   },
 
   keeper: {
+    // ---- Build 8 brain (js/keeper.js) ----
+    lineOff: 0.55,      // how far off the line he stands with play far away
+    maxOff: 2.4,        // furthest off the line he SETS while narrowing an angle
+    rushMax: 6.5,       // furthest off the line he will go to close down / claim
+    areaW: 6.2,         // his box: |x| he may work in (claims, smothers)
+    areaD: 6.5,         // his box depth (m off the line)
+    rushDist: 9.5,      // an attacker through on goal inside this is a 1v1
+    smotherR: 1.25,     // close enough to go down at the attacker's feet
+    smotherChance: 0.42,// base chance a smother takes the ball (x save ability)
+    recoverSpeed: 0.95, // fraction of top speed when sprinting back to the line
+    setSpeed: 0.62,     // fraction of top speed for shuffling while set
+    reactBase: 0.16,    // reaction delay (s) before the body moves on a shot
+    reach: 0.95,        // arm reach (m) standing, either side of the body
+    diveReach: 1.55,    // extra metres a full-stretch dive covers
+    // ---- possession (catch -> secure -> decide -> distribute -> released)
+    secureT: 0.35,      // settle the catch before looking up
+    decideMin: 0.45,    // shortest look-up before releasing
+    decideMax: 1.1,     // longest look-up (no pressure, waiting for a runner)
+    holdMax: 3.2,       // never hold longer than this (then he must go)
+    windupT: 0.28,      // throw / kick wind-up (animation owns this beat)
+    protectR: 2.4,      // physical bubble: opponents are eased out of it
+    rollMax: 9,         // a pass this short is rolled out
+    throwMax: 16,       // ... this short is thrown; longer is kicked
+    // ---- legacy tuning (still read by Match's save model) ----
     seeDist: 8.5,       // start diving when a loose ball is this close to the goal line
     saveWindow: 0.18,   // how far beyond the line a shot can still be clawed back
     depth: 5.2,         // how far in front of their goal the keeper may roam
@@ -264,6 +312,8 @@ LG.Config = {
       height: 30,
       distance: 25,       // sideways standoff from the action (east, +x)
       fov: 54,            // wide enough to keep both ends in frame at 1.4:1
+                          // (Build 8: js/camera.js scales the far presets with
+                          // the court, so the bigger cage still fits)
       // the side-on view barely drifts across the width, but follows the
       // action along the length (goals stay in frame, the view feels alive)
       xClamp: 4,
@@ -542,3 +592,21 @@ LG.RegularClothes = [
 ];
 
 // human starting team is 4 (blaze unlocked by default) — see progression
+
+// ------------------------------------------------------------
+// Build 8 — LG.Pitch: the playable area in one place. Read LIVE from
+// Config.court (never cached) so a mode that bends the court still sees
+// the truth. AI targets, clamps and formation depths use these instead of
+// the old literal 12.6 / 21.6 / 20.5 numbers that only fit 26x44.
+//   hw(m)/hl(m)   half width / half length minus a margin
+//   cx(x,m)/cz(z,m) clamp inside that margin
+//   sw/sl         scale vs the original 26x44 cage (formation depths)
+// ------------------------------------------------------------
+LG.Pitch = {
+  hw: function (m) { return LG.Config.court.width / 2 - (m || 0); },
+  hl: function (m) { return LG.Config.court.length / 2 - (m || 0); },
+  cx: function (x, m) { var h = LG.Config.court.width / 2 - (m == null ? 0.4 : m); return x < -h ? -h : x > h ? h : x; },
+  cz: function (z, m) { var h = LG.Config.court.length / 2 - (m == null ? 0.4 : m); return z < -h ? -h : z > h ? h : z; },
+  sw: function () { return LG.Config.court.width / 26; },
+  sl: function () { return LG.Config.court.length / 44; },
+};

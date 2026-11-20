@@ -31,6 +31,11 @@ if (!LG || !LG.GoalCinematic || !LG.MatchCamera) {
   process.exit(1);
 }
 
+// Build 8: the court grew to 30x50. This probe scripts celebration runs
+// and mate placements around fixed spots authored on the classic 26x44
+// cage (the cinematic itself reads the court live), so it pins that size.
+LG.Config.court.width = 26; LG.Config.court.length = 44;
+
 var pass = 0, fail = 0;
 function ok(cond, name) {
   if (cond) { pass++; console.log('  ok - ' + name); }

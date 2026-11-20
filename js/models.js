@@ -319,91 +319,124 @@ LG.Models = (function () {
   // panel reaches from the opening back to z = -goalDepth, so the
   // mouth always faces the field and the net extends into the pocket.
   // ------------------------------------------------------------
+  // Build 8 — the goal, reconstructed to match its physics (js/ball.js
+  // LG.GoalFrame) exactly: posts and crossbar at the collider radii, the
+  // side nets / roof / back net hung netInset inside the frame where the
+  // ball actually stops, a real rear frame (back posts, ground bar, top
+  // bar) the nets are tied to, and nets that sag/bulge a touch outward
+  // like real mesh. Each net panel is its own LineSegments, exposed on
+  // userData.nets, so a ball hitting it can ripple that panel (arena.js).
+  // Still lines + a handful of thin cylinders: a few draw calls a goal.
   function buildGoal(color) {
     var C = LG.Config.court;
+    var F = LG.Config.goalFrame || {};
     var g = new THREE.Group();
     var gw = C.goalWidth / 2;      // 2.6 half … full 5.2
     var gh = C.goalHeight;         // 1.9
     var gd = C.goalDepth;          // 1.8
+    var pr = F.postR || 0.07, br = F.barR || 0.06;
+    var inset = F.netInset != null ? F.netInset : 0.04;
 
     var postM = new THREE.MeshStandardMaterial({ color: 0xd9dee6, metalness: 0.75, roughness: 0.35 });
-    var netM = new THREE.LineBasicMaterial({ color: 0xdde1ea, transparent: true, opacity: 0.62, depthWrite: false });
+    var netM = new THREE.LineBasicMaterial({ color: 0xdde1ea, transparent: true, opacity: 0.6, depthWrite: false });
     var baseM = new THREE.MeshStandardMaterial({ color: 0x1b2027, roughness: 0.9 });
     var strutM = new THREE.MeshStandardMaterial({ color: 0xb9bfc9, metalness: 0.55, roughness: 0.5 });
+    var accentM = new THREE.MeshStandardMaterial({ color: color || 0xffffff, roughness: 0.6, metalness: 0.2 });
 
     // frame: two posts + crossbar — the mouth faces the pitch (+z)
-    var postL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, gh, 12), postM);
-    postL.position.set(-gw, gh / 2, 0);
+    var postL = new THREE.Mesh(new THREE.CylinderGeometry(pr, pr, gh + br, 12), postM);
+    postL.position.set(-gw, (gh + br) / 2, 0);
     postL.castShadow = true;
     g.add(postL);
     var postR = postL.clone();
     postR.position.x = gw;
     g.add(postR);
-    var cross = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, gw * 2, 12), postM);
+    var cross = new THREE.Mesh(new THREE.CylinderGeometry(br, br, gw * 2, 12), postM);
     cross.rotation.z = Math.PI / 2;
     cross.position.set(0, gh, 0);
     cross.castShadow = true;
     g.add(cross);
+    // team-colour sleeves at the foot of each post (street-goal padding)
+    var sleeve = new THREE.Mesh(new THREE.CylinderGeometry(pr + 0.02, pr + 0.02, 0.32, 12), accentM);
+    sleeve.position.set(-gw, 0.16, 0); g.add(sleeve);
+    var sleeve2 = sleeve.clone(); sleeve2.position.x = gw; g.add(sleeve2);
 
     // ground base plates so the goal line + pocket read from street level
-    var baseL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.06, gd), baseM);
-    baseL.position.set(-gw + 0.06, 0.03, -gd / 2); g.add(baseL);
-    var baseR = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.06, gd), baseM);
-    baseR.position.set(gw - 0.06, 0.03, -gd / 2); g.add(baseR);
+    var baseL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, gd), baseM);
+    baseL.position.set(-gw + 0.04, 0.025, -gd / 2); g.add(baseL);
+    var baseR = baseL.clone(); baseR.position.x = gw - 0.04; g.add(baseR);
+    var baseB = new THREE.Mesh(new THREE.BoxGeometry(gw * 2, 0.05, 0.16), baseM);
+    baseB.position.set(0, 0.025, -gd + 0.04); g.add(baseB);
 
-    // grid-panel builder: a genuine net (vertical + horizontal strands)
-    var NET_STEP = 0.28;
-    function netGrid(pw, ph, step) {
-      var pts = [];
-      var x, y;
-      for (x = -pw / 2; x <= pw / 2 + 1e-4; x += step) {
-        pts.push(new THREE.Vector3(x, 0, 0), new THREE.Vector3(x, ph, 0));
-      }
-      for (y = step; y <= ph + 1e-4; y += step) {
-        pts.push(new THREE.Vector3(-pw / 2, y, 0), new THREE.Vector3(pw / 2, y, 0));
-      }
-      var geo = new THREE.BufferGeometry().setFromPoints(pts);
-      return new THREE.LineSegments(geo, netM);
-    }
-
-    // back net, pinned behind the goal line
-    var back = netGrid(gw * 2, gh, NET_STEP);
-    back.position.set(0, 0, -gd);
-    g.add(back);
-    // side nets (inward-facing pockets)
-    var sideL = netGrid(gd, gh, NET_STEP);
-    sideL.rotation.y = Math.PI / 2;
-    sideL.position.set(-gw, 0, -gd / 2);
-    g.add(sideL);
-    var sideR = sideL.clone();
-    sideR.position.x = gw;
-    g.add(sideR);
-    // top net
-    var top = netGrid(gw * 2, gd, NET_STEP);
-    top.rotation.x = Math.PI / 2;
-    top.position.set(0, gh, -gd / 2);
-    g.add(top);
-
-    // thin support struts shaping the pocket (frame -> back corners)
-    function strut(x1, y1, z1, x2, y2, z2) {
+    // rear frame the nets are tied to
+    function strut(x1, y1, z1, x2, y2, z2, rad) {
       var dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
       var len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-      var m = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, len, 6), strutM);
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(rad || 0.025, rad || 0.025, len, 6), strutM);
       m.position.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
       var a = new THREE.Vector3(dx / len, dy / len, dz / len);
       m.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), a));
       m.castShadow = true;
       return m;
     }
-    g.add(strut(-gw, 0, 0, -gw, 0, -gd));
-    g.add(strut(gw, 0, 0, gw, 0, -gd));
-    g.add(strut(-gw, gh, 0, -gw, gh, -gd));
+    g.add(strut(-gw, gh, 0, -gw, gh, -gd));      // top side bars
     g.add(strut(gw, gh, 0, gw, gh, -gd));
-    g.add(strut(-gw, gh, -gd, gw, gh, -gd));
-    g.add(strut(-gw, 0, -gd, gw, 0, -gd));
-    g.add(strut(-gw, 0, -gd, -gw, gh, -gd));
-    g.add(strut(gw, 0, -gd, gw, gh, -gd));
+    g.add(strut(-gw, gh, -gd, gw, gh, -gd));     // top back bar
+    g.add(strut(-gw, 0, -gd, -gw, gh, -gd, 0.03)); // back posts
+    g.add(strut(gw, 0, -gd, gw, gh, -gd, 0.03));
 
+    // a net panel: a real mesh of strands, optionally bulging along its
+    // normal (sag > 0 = away from the pocket) — catenary-ish, max mid-panel
+    var STEP = 0.24;
+    function net(w, h, sag) {
+      var pts = [], x, y, n = Math.max(2, Math.round(w / STEP)), mN = Math.max(2, Math.round(h / STEP));
+      function bow(u, v) { return sag * Math.sin(Math.PI * u) * Math.sin(Math.PI * v); }
+      var i, j;
+      for (i = 0; i <= n; i++) {                       // vertical strands
+        var u = i / n;
+        for (j = 0; j < mN; j++) {
+          var v0 = j / mN, v1 = (j + 1) / mN;
+          pts.push(new THREE.Vector3(-w / 2 + u * w, v0 * h, bow(u, v0)), new THREE.Vector3(-w / 2 + u * w, v1 * h, bow(u, v1)));
+        }
+      }
+      for (j = 1; j <= mN; j++) {                      // horizontal strands
+        var v = j / mN;
+        for (i = 0; i < n; i++) {
+          var a0 = i / n, a1 = (i + 1) / n;
+          pts.push(new THREE.Vector3(-w / 2 + a0 * w, v * h, bow(a0, v)), new THREE.Vector3(-w / 2 + a1 * w, v * h, bow(a1, v)));
+        }
+      }
+      var geo = new THREE.BufferGeometry().setFromPoints(pts);
+      var ls = new THREE.LineSegments(geo, netM);
+      ls.userData.dynamic = true;
+      return ls;
+    }
+
+    // back net: hangs just inside the rear frame, bellies outward
+    var back = net(gw * 2 - 0.06, gh - 0.03, -0.1);
+    back.position.set(0, 0, -gd + inset);
+    g.add(back);
+    // side nets: inside the posts' line, belly outward
+    var sideL = net(gd - inset, gh - 0.03, 0.06);
+    sideL.rotation.y = -Math.PI / 2;
+    sideL.position.set(-(gw - inset), 0, -(gd - inset) / 2);
+    g.add(sideL);
+    var sideR = net(gd - inset, gh - 0.03, 0.06);
+    sideR.rotation.y = Math.PI / 2;
+    sideR.position.set(gw - inset, 0, -(gd - inset) / 2);
+    g.add(sideR);
+    // roof net: just under the top bars, sags a few cm
+    var top = net(gw * 2 - 0.06, gd - inset, -0.04);
+    top.rotation.x = -Math.PI / 2;
+    top.position.set(0, gh - inset, 0);
+    g.add(top);
+
+    g.userData.nets = {
+      back: { o: back, base: back.position.clone(), axis: 'z', sign: -1 },
+      sideL: { o: sideL, base: sideL.position.clone(), axis: 'x', sign: -1 },
+      sideR: { o: sideR, base: sideR.position.clone(), axis: 'x', sign: 1 },
+      roof: { o: top, base: top.position.clone(), axis: 'y', sign: 1 },
+    };
     return g;
   }
 

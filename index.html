@@ -191,7 +191,7 @@
         <button id="btn-how" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 0c0 2-2.5 2-2.5 4M12 17h.01"/></svg>HOW TO PLAY</button>
         <button id="btn-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>SETTINGS</button>
         <button id="btn-about" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>ABOUT</button>
-        <span class="menu-version" id="menu-version">v1.7.0</span>
+        <span class="menu-version" id="menu-version">v1.8.0</span>
       </nav>
     </div>
   </div>
@@ -642,7 +642,7 @@
         <div class="help-section" data-about="about">
           <div class="help-section-title">ABOUT</div>
           <div class="help-row"><span class="help-key">GAME</span><span class="help-desc">BLACKOUT is a 3V3 street football game with goalkeepers — quick matches, focused challenges and a four-team Street Cup.</span></div>
-          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.7.0</b></span></div>
+          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.8.0</b></span></div>
           <div class="help-row"><span class="help-key">RUN</span><span class="help-desc">Plays fully offline after the first load. No account, no server, no purchases.</span></div>
         </div>
         <div class="help-section" data-about="credits">
@@ -820,7 +820,7 @@
     if (window.THREE && THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 
     // Single early version stamp so a failed boot still shows a real number.
-    window.BLOCKOUT_VERSION = '1.7.0';
+    window.BLOCKOUT_VERSION = '1.8.0';
     window.addEventListener('error', function (e) {
       try {
         var box = document.getElementById('loading-error');

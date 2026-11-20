@@ -76,9 +76,15 @@ LG.MatchCamera.prototype = {
 
   target: function () {
     var c = this.cfg(), land = this.isLandscape(), P = LG.CameraPresets[this.presetId()][land ? 'landscape' : 'portrait'];
+    // Build 8: the presets were authored for the 26x44 cage. Follow limits
+    // scale with the court; the far presets (TELE, WIDE) also stand back in
+    // proportion so the bigger pitch still fits — the landscape wide shot
+    // by the full length ratio (it frames both goals), portrait gently.
+    var CC = LG.Config.court, kW = CC.width / 26, kL = CC.length / 44;
+    var far = c.distance >= 20 ? (land ? kL : Math.pow(kL, 0.6)) : 1;
     return {
-      height: c.height, distance: c.distance, fov: c.fov,
-      xClamp: c.xClamp, zClamp: c.zClamp,
+      height: c.height * far, distance: c.distance * far, fov: c.fov,
+      xClamp: c.xClamp * kW, zClamp: c.zClamp * kL,
       ballW: P.ballW, lead: P.lead, damp: P.damp, lookY: P.lookY, swing: P.swing,
     };
   },
@@ -221,7 +227,7 @@ LG.MatchCamera.prototype = {
       // the ball keeper may follow a ball right to the end line / corner
       this.followX = U.clamp(this.followX, -C.xClamp - keep * 3, C.xClamp + keep * 3);
       this.followZ = U.clamp(this.followZ, -C.zClamp - keep * 4, C.zClamp + keep * 4);
-      this.followX = U.clamp(this.followX, targetX - 13, targetX + 13);
+      this.followX = U.clamp(this.followX, targetX - 13 * (LG.Config.court.width / 26), targetX + 13 * (LG.Config.court.width / 26));
       this.followZ = U.clamp(this.followZ, targetZ - 15, targetZ + 30);
     }
 

@@ -182,7 +182,8 @@ LG.GoalCinematic = (function () {
       dt = LG.Util.clamp(dt || 0, 0, 0.1);
       t += dt;
 
-      var C = cam.cfg();
+      // Build 8: the court-scaled numbers the live camera really uses
+      var C = cam.target ? cam.target() : cam.cfg();
       var land = cam.isLandscape();
 
       // follow simulation — js/camera.js:77-107, so handback lands exactly
@@ -199,7 +200,7 @@ LG.GoalCinematic = (function () {
         fSim.x = LG.Util.clamp(fSim.x, targetX - 20, targetX + 20);
         fSim.z = LG.Util.clamp(fSim.z, targetZ - 20, targetZ + 20);
       } else {
-        fSim.x = LG.Util.clamp(fSim.x, targetX - 13, targetX + 13);
+        fSim.x = LG.Util.clamp(fSim.x, targetX - 13 * (LG.Config.court.width / 26), targetX + 13 * (LG.Config.court.width / 26));
         fSim.z = LG.Util.clamp(fSim.z, targetZ - 15, targetZ + 30);
       }
 

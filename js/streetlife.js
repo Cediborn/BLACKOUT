@@ -208,10 +208,14 @@ LG.StreetLife = (function () {
 
   // ============================================================ FESTOON LIGHTS
   function buildFestoon(g) {
+    var HL = (LG.Config && LG.Config.court ? LG.Config.court.length : 44) / 2;
+    var ZA = HL + 2.2, ZB = HL + 5.6;
     var strands = [];
     [1, -1].forEach(function (zs) {
       // three strands zig-zag over each stand, hung from 5 m posts
-      var z0 = zs * 24.2, z1 = zs * 27.6;
+      // Build 8: hung relative to the end fence, so the bigger cage keeps
+      // them over the stands (was a fixed 24.2 / 27.6 for a 44 m court)
+      var z0 = zs * ZA, z1 = zs * ZB;
       strands.push([[-10.5, 5.2, z0], [-3.5, 5.0, z1]], [[-3.5, 5.0, z1], [3.5, 5.0, z0]], [[3.5, 5.0, z0], [10.5, 5.2, z1]]);
       strands.push([[-10.5, 5.2, z1], [10.5, 5.2, z1]]);
     });
@@ -231,7 +235,7 @@ LG.StreetLife = (function () {
     g.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x15161a })));
     // posts at the strand ends
     var postM = new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.7, metalness: 0.4 });
-    [[-10.5, 24.2], [10.5, 24.2], [-10.5, 27.6], [10.5, 27.6], [-3.5, 27.6], [3.5, 24.2]].forEach(function (q) {
+    [[-10.5, ZA], [10.5, ZA], [-10.5, ZB], [10.5, ZB], [-3.5, ZB], [3.5, ZA]].forEach(function (q) {
       [1, -1].forEach(function (zs) {
         var post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 5.2, 8), postM);
         post.position.set(q[0], 2.6, zs * q[1]); post.castShadow = true; g.add(post);

@@ -197,7 +197,8 @@ LG.Player.prototype.update = function (dt) {
   var C = LG.Config.court;
   var halfW = C.width / 2 - this.radius - 0.02;
   var halfL = C.length / 2 - 0.25;
-  var gw = C.goalWidth / 2;
+  // Build 8: only a body that fits between the posts may step onto the line
+  var gw = C.goalWidth / 2 - ((LG.Config.goalFrame && LG.Config.goalFrame.postR) || 0.07) - this.radius * 0.8;
   this.x = U.clamp(this.x, -halfW, halfW);
   if (Math.abs(this.x) < gw) {
     // inside goal mouth: allowed just past the line, never INTO the net pocket
@@ -213,7 +214,10 @@ LG.Player.prototype.update = function (dt) {
   // lerp as the error approaches 180°) instead of snapping the body around.
   // Below ~0.14 m/s the body holds and the idle square-up below takes over.
   var sp = this.vx * this.vx + this.vz * this.vz;
-  if (sp > 0.02) {
+  // Build 8: a keeper holding the ball faces where his brain looks (the
+  // receiver), not where his feet drift — no snapping while he walks it out
+  var heldByKeeper = this.isGoalkeeper && this._gkProtected;
+  if (sp > 0.02 && !heldByKeeper) {
     var target = Math.atan2(this.vx, this.vz);
     // facing is rotation.y of the model; character model faces +Z at rot 0
     var da = target - this.facing;

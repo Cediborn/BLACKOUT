@@ -894,7 +894,9 @@ section('5. match settings are wired into the real game state');
   LG.Settings.setView('portrait');
   camCtrl.reset();
   camCtrl.update(0.02, 0, 0, 0, 0);
-  var pBehind = rec.position.x === 0 && rec.position.y === 30 && rec.position.z === 25;
+  // Build 8: the far presets stand back with the court (camera.target())
+  var T0 = camCtrl.target();
+  var pBehind = rec.position.x === 0 && rec.position.y === T0.height && rec.position.z === T0.distance;
   var pLookAway = rec.lookZ < rec.position.z;                 // looking toward -z (away goal)
   check(pBehind && pLookAway,
     'PORTRAIT pose: camera behind the play on +z, looking along -z',
@@ -908,13 +910,14 @@ section('5. match settings are wired into the real game state');
   check(lSide && lAcross,
     'LANDSCAPE pose: camera moves to the east touchline (+x) and looks across the width',
     '(' + rec.position.x + ',' + rec.position.y + ',' + rec.position.z + ') lookAt(' + rec.lookX + ',' + rec.lookY + ',' + rec.lookZ + ')');
-  check(rec.position.x === 25 && rec.position.z === 0,
+  var TL = camCtrl.target();
+  check(rec.position.x === TL.distance && rec.position.z === 0,
     'LANDSCAPE pose is a genuine side view (not a portrait pulled wider)',
     'x=' + rec.position.x + ' z=' + rec.position.z);
 
   // and it FOLLOWS the play along the length (the horizontal gameplay axis)
   camCtrl.update(0.02, 0, -14, 0, -14);          // action drives 14m toward the away goal
-  check(rec.position.z < -1.5 && rec.position.z > -14.5 && rec.position.x === 25,
+  check(rec.position.z < -1.5 && rec.position.z > -14.5 && rec.position.x === TL.distance,
     'LANDSCAPE camera tracks the action left-to-right along -z',
     'z=' + rec.position.z.toFixed(2) + ' x=' + rec.position.x);
 
@@ -959,7 +962,7 @@ section('5. match settings are wired into the real game state');
   var mid = rec.position.x;
   check(mid > 7.7 && mid < 30, 'switching presets blends (no cut): one frame later the camera is between them', mid.toFixed(2));
   for (var bf = 0; bf < 200; bf++) camCtrl.update(0.02, 0, 0, 0, 0);
-  check(Math.abs(rec.position.x - 36) < 0.5, '...and settles on the new preset', rec.position.x.toFixed(2));
+  check(Math.abs(rec.position.x - camCtrl.target().distance) < 0.5, '...and settles on the new preset', rec.position.x.toFixed(2));
   check(LG.Settings.snapshot().camera === 1, 'the camera choice is saved with the settings');
   LG.Settings.setCamera(3);
 })();

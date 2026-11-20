@@ -387,7 +387,11 @@ section('the CPU uses them (and only under pressure)');
 section('a real CPU-vs-CPU stretch of play');
 (function () {
   var m = newMatch(); m.start();
-  m.all.forEach(function (p) { p.isHuman = false; if (!p.ai && LG.AI && LG.AI.create) p.ai = LG.AI.create(p, m); });
+  // Build 8: genuinely CPU-vs-CPU — the human slot gets a real brain too
+  // (LG.AI.create never existed, so that player used to stand still holding
+  // the ball, which is not open play) and auto-switch must not re-arm him
+  m.activatePlayer = function () {};
+  m.all.forEach(function (p) { p.isHuman = false; if (!p.ai) p.ai = p.isGoalkeeper ? new LG.KeeperBrain(p) : new LG.AIBrain(p); });
   var count = 0, pressed = 0;
   m.bus.on('skillMove', function () { count++; });
   for (var i = 0; i < 60 * 90; i++) {

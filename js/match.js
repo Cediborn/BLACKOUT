@@ -392,8 +392,10 @@ LG.MatchManager.prototype = {
   placeKickoff: function () {
     var halfW = LG.Config.court.width / 2 - 0.6;
     var i, p, pos;
-    var homePos = [[0, 9], [-6, 13], [6, 13]];
-    var awayPos = [[0, -9], [-6, -13], [6, -13]];
+    // Build 8: the shape scales with the cage (same spacing on any court)
+    var ksw = LG.Pitch.sw(), ksl = LG.Pitch.sl();
+    var homePos = [[0, 9 * ksl], [-6 * ksw, 13 * ksl], [6 * ksw, 13 * ksl]];
+    var awayPos = [[0, -9 * ksl], [-6 * ksw, -13 * ksl], [6 * ksw, -13 * ksl]];
     // nobody carries a facing into the restart: the spawn facing is random and
     // the post-goal celebration leaves everyone aimed at +z (atan2 of a zero
     // nudge), so line every outfielder up looking at the ball instead. The
@@ -622,6 +624,46 @@ LG.MatchManager.prototype = {
       q.update(dt);
     }
     this.resolvePlayerCollisions();
+    if (!frozen) this.enforceKeeperBubble(dt);
+  },
+
+  // ------------------------------------------------------------
+  // Build 8 — GOALKEEPER PROTECTION. A keeper who has the ball SECURED in
+  // his hands (KeeperBrain possession: secure / decide / windup) cannot be
+  // tackled (tryTackle), every opponent's AI holds off at keeperProtectR
+  // (AIBrain.respectKeeperZone), and any body — the human's included —
+  // that still drifts inside the physical bubble is eased back out of it,
+  // its inward velocity removed, so nobody leans on him or wrestles for a
+  // held ball. State-based: a loose ball he merely touches, a parry, or a
+  // ball he dribbles outside his box is NOT protected.
+  keeperProtected: function (gk) {
+    return !!(gk && gk.isGoalkeeper && gk.hasBall && gk._gkProtected);
+  },
+
+  enforceKeeperBubble: function (dt) {
+    var R = LG.Config.keeper.protectR || 2.4;
+    for (var i = 0; i < this.all.length; i++) {
+      var gk = this.all[i];
+      if (!this.keeperProtected(gk)) continue;
+      var opps = this.opponents(gk);
+      for (var j = 0; j < opps.length; j++) {
+        var o = opps[j];
+        var dx = o.x - gk.x, dz = o.z - gk.z;
+        var d = Math.sqrt(dx * dx + dz * dz);
+        if (d >= R) continue;
+        var nx, nz;
+        if (d > 0.001) { nx = dx / d; nz = dz / d; }
+        else { nx = 0; nz = gk.team === 0 ? -1 : 1; }
+        var k = Math.min(1, dt * 9);
+        o.x += nx * (R - d) * k;
+        o.z += nz * (R - d) * k;
+        // never through the cage or into the net
+        o.x = LG.Pitch.cx(o.x, o.radius + 0.02);
+        o.z = LG.Pitch.cz(o.z, 0.25);
+        var vin = o.vx * nx + o.vz * nz;
+        if (vin < 0) { o.vx -= vin * nx; o.vz -= vin * nz; }
+      }
+    }
   },
 
   // ------------------------------------------------------------
@@ -888,6 +930,8 @@ LG.MatchManager.prototype = {
     // for ballTravelTime's lead estimate, so the aim point never drifts.
     var passVy = function (dist) {
       if (perfect) return 0;
+      // Build 8: a keeper ROLLS short distribution along the floor
+      if (opts && opts.vy != null) return opts.vy;
       return U.clamp(dist * (P.passVyPerM || 0.13), P.passVyMin || 0.7, P.passVyMax || 2.2);
     };
     var vy = passVy(d);
@@ -902,8 +946,8 @@ LG.MatchManager.prototype = {
         var tGo = this.ballTravelTime(src.distTo(px, pz), speed, vy);
         if (!isFinite(tGo)) tGo = 0.5;
         tGo = U.clamp(tGo, 0, 1.1);                 // a sensible lead, never a chase
-        var nx = U.clamp(target.x + target.vx * tGo, -12.5, 12.5);
-        var nz = U.clamp(target.z + target.vz * tGo, -21.5, 21.5);
+        var nx = LG.Pitch.cx(target.x + target.vx * tGo, 0.5);
+        var nz = LG.Pitch.cz(target.z + target.vz * tGo, 0.5);
         if (Math.abs(nx - px) < 0.03 && Math.abs(nz - pz) < 0.03) { px = nx; pz = nz; break; }
         px = nx;
         pz = nz;
@@ -954,7 +998,11 @@ LG.MatchManager.prototype = {
     // identical at every level, so a Hard shot is never a magic rocket.
     var acc = (opts && opts.accuracy != null) ? opts.accuracy : 1;
     var spray = (1 - p.stats.shoot / 12) / (acc || 1);
-    var gx = goal.x + (U.rand() - 0.5) * 2.3 * spray;
+    // Build 8: the AI picks its spot (opts.target — away from the keeper,
+    // clear of blockers); the spray around it is the same skill/difficulty
+    // spread as ever, so a corner-bound shot can still miss or hit the post
+    var aimX = (opts && opts.target) ? opts.target.x : goal.x;
+    var gx = aimX + (U.rand() - 0.5) * 2.3 * spray;
     var gz = goal.z + (U.rand() - 0.5) * 1.2 * spray;
     var dx = gx - p.x, dz = gz - p.z;
     var d = Math.sqrt(dx * dx + dz * dz) || 1;
@@ -1146,7 +1194,7 @@ LG.MatchManager.prototype = {
       if (victim.isGoalkeeper) {
         // keeper possession protection: no legal tackle during the hold window.
         // The Math.random() roll below always runs so the seed stream stays aligned.
-        if (victim._saveProtectT > 0 || victim.distributeT > 0) chance = 0;
+        if (victim._saveProtectT > 0 || this.keeperProtected(victim)) chance = 0;
       }
 
       // always consume the roll (even at chance 0) so the deterministic
@@ -1172,12 +1220,14 @@ LG.MatchManager.prototype = {
         this.statSide(p.team).tackles++;
         this._assist = null;   // contested ball — the previous pass chain is dead
         this.bus.emit('tackleWin', { src: p, victim: victim });
-      } else {
+      } else if (!this.keeperProtected(victim)) {
         // a failed challenge is contact, not a freeze: the carrier stumbles for
-        // a moment and play keeps flowing
+        // a moment and play keeps flowing. (Build 8: a keeper holding a
+        // secured ball is never bumped — spamming TACKLE at him used to stun
+        // him every frame so he could never distribute.)
         victim.stun = Math.max(victim.stun, P.tackleBumpStun || 0.12);
       }
-      victim.stomp = Math.max(victim.stomp, won ? 0.3 : 0.14);
+      if (!this.keeperProtected(victim)) victim.stomp = Math.max(victim.stomp, won ? 0.3 : 0.14);
       LG.Particles.burst(victim.x, 0.8, victim.z, 0xffeecc, won ? 12 : 6, 4, 4);
       if (won) LG.Particles.ring(victim.x, victim.z, 0xfff3c0, 3.2, 0.4);
     } else {
@@ -1367,6 +1417,10 @@ LG.MatchManager.prototype = {
     p.hasBall = true;
     ball.owner = p;
     this.possessionTeam = p.team;
+    // Build 8: a keeper gathering the ball in his own box has it in his
+    // hands from THIS instant — no frame where an opponent can nick it
+    // before his brain has run (KeeperBrain.possession keeps it set)
+    if (p.isGoalkeeper && p.ai && p.ai.inArea) p._gkProtected = p.ai.inArea();
     this.gainMetersQuickly(p, 0); // no-op
     this.bus.emit('possession', { player: p });
 
@@ -1424,6 +1478,15 @@ LG.MatchManager.prototype = {
     } else p._shielding = false;
     var ssp = LG.Skills && LG.Skills.ballSpot(p);
     if (ssp) { ahead = ssp.ahead; side = ssp.side; lift = ssp.lift; }
+    // Build 8: a keeper with the ball SECURED holds it in his hands at the
+    // chest — no dribble rhythm, no touches, no ball rolling at his feet
+    var held = p.isGoalkeeper && p._gkProtected;
+    if (held) {
+      ahead = 0.36; side = 0; rhythm = 0;
+      var st = p.ai && p.ai.poss && p.ai.poss.st;
+      var kickUp = st === 'windup' && p.ai.poss.plan && (p.ai.poss.plan.kind === 'kick' || p.ai.poss.plan.kind === 'clear');
+      lift = kickUp ? 0.35 : 0.72;
+    }
     var bx = p.x + Math.sin(p.facing) * ahead + Math.cos(p.facing) * side;
     var bz = p.z + Math.cos(p.facing) * ahead - Math.sin(p.facing) * side;
     var wantY = ball.r + (p.sprinting || p.active ? 0.05 : 0) + lift;
@@ -1432,6 +1495,7 @@ LG.MatchManager.prototype = {
     // FIRST TOUCH: a ball that just arrived is cushioned into the stride
     // over ~0.18 s from where it met the body, not teleported to the feet
     if (ball._carrier !== p) { ball._carrier = p; ball._cushT = 0.18; ball._cx = ball.x - bx; ball._cz = ball.z - bz; }
+    if (held) ball.y = LG.Util.lerp(ball.y, wantY, Math.min(1, dt * 10));
     if (ball._cushT > 0 && dt > 0) {
       ball._cushT = Math.max(0, ball._cushT - dt);
       var ck = ball._cushT / 0.18;
@@ -1439,6 +1503,9 @@ LG.MatchManager.prototype = {
     }
     ball.x = bx;
     ball.z = bz;
+    // Build 8: a carried ball obeys the goal frame too — it cannot be pushed
+    // through the end fence, the posts or the side netting by its carrier
+    if (LG.GoalFrame && LG.GoalFrame.constrainCarried(ball, p)) { rhythm = 0; vx0 = 0; vz0 = 0; }
     ball.vx = p.vx;
     ball.vz = p.vz;
     ball.vy = 0;
@@ -1483,8 +1550,9 @@ LG.MatchManager.prototype = {
   },
 
   // Is an inbound, unowned ball realistically threatening this keeper's goal?
-  // Returns prediction data {px, pz, dist0, sp} or null.  dist0 is the signed
-  // distance to the line (>=0 in front, small negative = just past it).
+  // Returns prediction data {px, py, pz, dist0, sp, tt} or null. dist0 is the
+  // signed distance to the line (>=0 in front, small negative = just past it),
+  // px/py where the ball will cross the line, tt the time until it does.
   keeperThreat: function (gk) {
     var ball = this.ball;
     var C = LG.Config.court;
@@ -1497,36 +1565,55 @@ LG.MatchManager.prototype = {
     var dist0 = (line - ball.z) * sign;                  // front of the line = positive
     // How early a keeper picks up the flight of the ball is their reaction.
     var seeMul = 0.62 + 0.38 * (LG.Difficulty.forKeeper(gk.team).goalkeeperReaction || 1);
-    if (dist0 > K.seeDist * seeMul) return null;         // too early to react
+    // a hard, long-range strike is picked up earlier than a toe-poke
+    var see = K.seeDist * seeMul * (1 + LG.Util.clamp((ball.speed() - 14) / 40, 0, 0.35));
+    if (dist0 > see) return null;                        // too early to react
     if (dist0 < -K.saveWindow) return null;              // fully over the line = goal
-    if (ball.y > C.goalHeight + 0.05) return null;       // over the bar
     var tt = Math.max(0, dist0) / vzT;
     var px = ball.x + ball.vx * tt;
+    var g = Math.abs(LG.Config.physics.gravity) || 17;
+    var py = Math.max(ball.r, ball.y + ball.vy * tt - 0.5 * g * tt * tt);
+    if (ball.y > C.goalHeight + 0.05 && py > C.goalHeight) return null;   // over the bar
+    if (py > C.goalHeight + 0.35) return null;           // sailing over
     if (Math.abs(px) > C.goalWidth / 2 + 1.4) return null; // heading wide
     var pz = line - sign * 0.1;
-    return { px: px, pz: pz, dist0: dist0, sp: ball.speed3() };
+    return { px: px, py: py, pz: pz, dist0: dist0, sp: ball.speed3(), tt: tt };
   },
 
-  // 0..1 save likelihood — harder/placed shots and closer shots beat the
-  // keeper more often.  Rerolled once per kick, not per frame.
-  // BOTH keepers share Difficulty.forKeeper (one profile for both ends), so
-  // neither goal is artificially stronger or weaker than the other.
+  // 0..1 save likelihood. Build 8: a REACH model, so where the keeper is
+  // standing decides most of it. The keeper covers his arm reach standing,
+  // plus a full-stretch dive that he only completes if there is time left
+  // after his reaction. A shot inside comfortable reach is usually saved; a
+  // shot at the edge of a full stretch is a coin-flip; beyond it he can only
+  // get fingertips to it. Pace and a high corner beat him more often.
+  // Rerolled once per kick, not per frame. BOTH keepers share
+  // Difficulty.forKeeper, so neither goal is artificially stronger.
   keeperSaveChance: function (gk, th) {
     var U = LG.Util;
     var C = LG.Config.court;
     var K = LG.Config.keeper;
-    var gw = C.goalWidth / 2;
+    var D = LG.Difficulty.forKeeper(gk.team);
     var sp = th.sp;
-    var reaction = U.clamp(th.dist0 / Math.max(sp, 6) / K.rxnWindow, 0, 1);
-    var hard = U.clamp((sp - 12) / 20, 0, 1);
-    var centered = U.clamp(1 - Math.abs(th.px) / (gw * 1.15), 0.15, 1);
-    var agility = U.clamp(1.4 - Math.abs(gk.x - th.px) * 0.38, 0.15, 1);
-    // Reflex roll on top of the keeper's physical block: placed shots beat the
-    // keeper, a shot straight at him does not, and pace always helps the shooter
-    var chance = (0.42 + reaction * 0.26) * (0.5 + centered * 0.4) * (0.5 + agility * 0.35) - hard * 0.1;
+    var tt = th.tt != null ? th.tt : Math.max(0, th.dist0) / Math.max(sp, 6);
+    var react = (K.reactBase || 0.16) / (D.goalkeeperReaction || 1);
+    var need = Math.abs(th.px - gk.x);
+    var py = th.py != null ? th.py : this.ball.y;
+    // time to stretch after reading it (a late read still allows a part-dive)
+    var stretch = U.clamp((tt - react * 0.5) / 0.32, 0.3, 1);
+    var avail = (K.reach || 0.95) + (K.diveReach || 1.55) * stretch;
+    // a high ball to the side is a longer way for the hands to go
+    var high = U.clamp((py - 1.25) / 0.6, 0, 1);
+    var low = U.clamp((0.45 - py) / 0.3, 0, 1);
+    avail -= need > 0.9 ? high * 0.45 + low * 0.2 : 0;
+    var margin = avail - need;
+    var reachK = U.clamp((margin + 0.3) / 1.0, 0, 1);    // -0.3 -> 0, +0.7 -> 1
+    reachK = reachK * reachK * (3 - 2 * reachK);
+    var hard = U.clamp((sp - 14) / 20, 0, 1);
+    var chance = (0.06 + 0.84 * reachK) * (1 - hard * 0.28);
     // difficulty multiplies the reflex roll — never the shot's flight
-    chance *= (LG.Difficulty.forKeeper(gk.team).goalkeeperSaveAbility || 1);
-    return U.clamp(chance, 0.03, 0.92);
+    chance *= (D.goalkeeperSaveAbility || 1);
+    th._margin = margin;
+    return U.clamp(chance, 0.03, 0.93);
   },
 
   // Per-frame keeper pass: run save prediction + one-shot save roll.
@@ -1583,18 +1670,24 @@ LG.MatchManager.prototype = {
     // keeper": opponents cannot strip him mid-transition (tryTackle).
     gk._saveProtectT = K.saveProtect || 0.5;
 
-    // fast shots + lucky parries knock it clear instead of a clean catch
-    if (th.sp > 19 || Math.random() < 0.3) {
+    // Build 8: a ball inside comfortable reach at a catchable pace is held;
+    // a stretch, a rocket or a high one is parried (and sometimes fumbled)
+    var margin = th._margin != null ? th._margin : 0.5;
+    var catchable = th.sp < 19.5 && margin > 0.45 && (th.py == null || th.py < 1.75);
+    var gw = C.goalWidth / 2;
+    if (!catchable || Math.random() < 0.18) {
       ball._guided = null;
       ball.lastKicker = gk;                       // own-goal protection for the parry
       if (ball.noPk !== gk) { ball.noPk = ball.lastKicker; ball.noPkT = 0.5; }
-      ball.x = U.clamp(ball.x, -C.goalWidth / 2, C.goalWidth / 2);
-      ball.z = line - sign * 0.12;
-      ball.y = ball.r;
+      // the ball is met in front of the line where the hands are — never
+      // teleported across the mouth
+      if (Math.abs(ball.x) < gw) ball.x = U.clamp(ball.x, -(gw - ball.r - 0.1), gw - ball.r - 0.1);
+      ball.z = line - sign * (ball.r + 0.08);
+      ball._inGoal = 0;
+      ball.y = Math.max(ball.r, Math.min(ball.y, C.goalHeight - 0.3));
       ball.vy = 1.5 + Math.random() * 0.8;
       // deflect it AWAY from the middle — punch toward the nearest wing or, for
       // a shot through the middle, the side the keeper is already diving toward.
-      // A straight-out parry sat the ball up on the penalty spot for the rebound.
       var side = Math.abs(th.px) < 0.8 ? (Math.random() < 0.5 ? -1 : 1) : (th.px > 0 ? 1 : -1);
       ball.vx = side * (4 + Math.random() * 3);
       ball.vz = -sign * (5 + Math.random() * 3);
@@ -1602,11 +1695,12 @@ LG.MatchManager.prototype = {
       this.possessionTeam = -1;
       gk._recoverT = 0.6;                         // scramble before the next save
     } else {
-      // clean catch: freeze, hold, then distribute
+      // clean catch: into the hands, then the possession machine takes over
       ball._guided = null;
-      ball.x = U.clamp(ball.x, -C.goalWidth / 2, C.goalWidth / 2);
-      ball.z = line - sign * 0.07;
-      ball.y = ball.r;
+      if (Math.abs(ball.x) < gw) ball.x = U.clamp(ball.x, -(gw - ball.r - 0.1), gw - ball.r - 0.1);
+      ball.z = line - sign * (ball.r + 0.05);
+      ball._inGoal = 0;
+      ball.y = Math.max(ball.r, Math.min(ball.y, 1.5));
       ball.vx = ball.vy = ball.vz = 0;
       ball.mesh.position.set(ball.x, ball.y, ball.z);
       gk.distributeT = K.distributeDelay;
@@ -1633,29 +1727,18 @@ LG.MatchManager.prototype = {
     var gw = C.goalWidth / 2;
     var r = ball.r;
 
-    // a fast ball can cross the goal plane between frames, so judge the whole
-    // step: the highest the ball got (bar clearance) and the farthest the
-    // segment reached (goal line). prevZ/prevY are captured before ball.step.
-    var prevZ = (this._ballPrevZ !== undefined) ? this._ballPrevZ : ball.z;
-    var prevY = (this._ballPrevY !== undefined) ? this._ballPrevY : ball.y;
-
-    // mouth check is center-based with a little body allowance: the ball can
-    // ride just past the post plane when it is still physically inside the goal
-    if (Math.abs(ball.x) > gw + r * 0.5) return;
-    if (Math.max(prevY, ball.y) > C.goalHeight + 0.05) return; // over the bar
-
-    var goalZ = null;
-    if (prevZ >= -halfL && ball.z <= -halfL) goalZ = 'away';  // north goal: home scores
-    else if (prevZ <= halfL && ball.z >= halfL) goalZ = 'home';  // south goal: away scores
-    if (!goalZ) {
-      // already parked in the net from an earlier frame that slipped the check
-      if (ball.z < -halfL) goalZ = 'away';
-      else if (ball.z > halfL) goalZ = 'home';
-    }
-
+    // Build 8: the goal is judged by LG.GoalFrame (js/ball.js), which owns the
+    // physical goal: the ball only enters the goal volume through the mouth
+    // (posts, crossbar, side/back/roof nets and the end fence are real
+    // colliders, swept in sub-steps so a fast shot cannot tunnel), and a goal
+    // is the WHOLE ball past the line inside that volume — once per ball.
+    // Brushing the side netting, the back of the net, the woodwork or the
+    // outside of the frame can never score on its own.
+    var goalZ = LG.GoalFrame.judge(ball);
     if (!goalZ) return;
     // Build 6: drills and shootouts judge the line themselves
     if (this.ctrl && this.ctrl.goalLine && this.ctrl.goalLine(this, goalZ) === true) return;
+    ball._goalLatch = true;           // one shot, one goal (reset() re-arms it)
 
     // Goal attribution is by NET: whichever goal the ball crossed into, the
     // OTHER team scores. A genuine own goal counts too — a defender's deflection
@@ -1693,7 +1776,6 @@ LG.MatchManager.prototype = {
     this.stateT = LG.Config.match.goalDelay;
 
     // celebration FX
-    var gx = goalZ === 'away' ? -halfL - 0.5 : halfL + 0.5;
     LG.Particles.confetti(ball.x, 2.2, gzOf(goalZ), teamGot === 0 ? 0x35e0ff : 0xff4d5e, 70);
     LG.Particles.ring(ball.x, gzOf(goalZ), 0xffffff, 7, 0.7);
     this.shakeEffect(0.6, 0.7);

@@ -149,6 +149,9 @@ function load(rel) {
 
 if (!window.LG || !window.LG.MatchManager) { console.log('failed to boot LG'); process.exit(1); }
 var LG = window.LG;
+// Build 8: the court grew (26x44 -> 30x50). Goal-relative test geometry is
+// written against GL (half length) so every scenario keeps its meaning.
+var GL = LG.Config.court.length / 2;
 
 // particles + progression + HUD aren't under test — progression only needs
 // enough surface for match.js endMatch to package a result (no persistence)
@@ -349,7 +352,7 @@ section('2. passes actually reach their receiver');
     var h = m.active;
     var mate = m.home.filter(function (p) { return !p.isGoalkeeper && p !== h; })[0];
     m.away.forEach(function (p) { place(p, 40, 40); });
-    m.home.forEach(function (p) { if (p.isGoalkeeper) p.z = 22; });
+    m.home.forEach(function (p) { if (p.isGoalkeeper) p.z = GL; });
     place(h, 0, 10, Math.PI);
     giveBall(m, h);
     place(mate, 0, 10 - dist, Math.PI);
@@ -382,8 +385,8 @@ section('3. shot power (pass vs tap vs full charge)');
     m.state = 'PLAY';
     var h = m.active;
     m.all.forEach(function (p) { if (!p.isGoalkeeper) place(p, 40, 40); });
-    m.home[3].x = 0; m.home[3].z = 22;      // home keeper stays home
-    m.away[3].x = 0; m.away[3].z = -22;
+    m.home[3].x = 0; m.home[3].z = GL;      // home keeper stays home
+    m.away[3].x = 0; m.away[3].z = -GL;
     place(h, 0, 8, Math.PI);                 // 8m outside the away goal (-22)
     giveBall(m, h);
     return { m: m, h: h };
@@ -423,7 +426,7 @@ section('3. shot power (pass vs tap vs full charge)');
   // aim: aiming at a post must pick that post out, not drift at the keeper
   function shotAt(dx, dz) {
     var s = setup();
-    place(s.h, 0, -14, Math.PI);          // 8m from the away goal
+    place(s.h, 0, -(GL - 8), Math.PI);    // 8m from the away goal
     giveBall(s.m, s.h);
     s.h.want.x = dx; s.h.want.z = dz;
     s.m.fireHumanShotReal(s.h, 1);
@@ -597,7 +600,7 @@ section('6. sprint + stamina (driven through the real stick + SPRINT button)');
   var p = m.active;
   m.all.forEach(function (o) {
     if (o === p) return;
-    if (o.isGoalkeeper) { o.x = 0; o.z = o.team === 0 ? 21.5 : -21.5; return; }
+    if (o.isGoalkeeper) { o.x = 0; o.z = o.team === 0 ? (GL - 0.5) : -(GL - 0.5); return; }
     place(o, 39, 39);
   });
   // run up the left wing: a clear runway, and freeze everyone else so the test
@@ -652,7 +655,7 @@ section('6b. ball roll: passes and shots must actually travel');
   function roll(speed) {
     var m = newMatch();
     var b = m.ball;
-    b.reset(0, 19);
+    b.reset(0, GL - 3);
     b.kick(0, 0.1, -speed);
     var z0 = b.z, travelled = 0;
     for (var i = 0; i < 60 * 12; i++) {
@@ -684,8 +687,8 @@ section('7. goalkeepers');
       if (p.isGoalkeeper) { m.repositionGoalkeeper(p); return; }
       place(p, 40, 40);
     });
-    gk.x = 0; gk.z = -21.2;
-    var z0 = fromZ === undefined ? -8 : fromZ, z1 = -22.2;
+    gk.x = 0; gk.z = -(GL - 0.8);
+    var z0 = fromZ === undefined ? -(GL - 14) : fromZ, z1 = -(GL + 0.2);
     var dx = aimX, dz = z1 - z0, d = Math.sqrt(dx * dx + dz * dz);
     m.ball.reset(0, z0);
     m.ball.vx = dx / d * speed; m.ball.vz = dz / d * speed;
@@ -715,10 +718,10 @@ section('7. goalkeepers');
     return { goals: goals / N, saves: saves / N, tally: tally };
   }
   var N = 250;
-  var post = runShots(N, -8, 1.7, 2.4);        // aimed inside the post
-  var atKeeper = runShots(N, -8, 0, 0.6);      // banged straight at the keeper
-  var anywhere = runShots(N, -8, 0, 2.4);      // mixed
-  var close = runShots(N, -16.5, 1.7, 2.4);    // 6m out, same placement
+  var post = runShots(N, -(GL - 14), 1.7, 2.4);        // aimed inside the post
+  var atKeeper = runShots(N, -(GL - 14), 0, 0.6);      // banged straight at the keeper
+  var anywhere = runShots(N, -(GL - 14), 0, 2.4);      // mixed
+  var close = runShots(N, -(GL - 5.5), 1.7, 2.4);    // 6m out, same placement
   info('outcomes ' + JSON.stringify(anywhere.tally));
   info('14m on target   : ' + (anywhere.goals * 100).toFixed(0) + '% goals / ' + (anywhere.saves * 100).toFixed(0) + '% stopped');
   info('14m near the post: ' + (post.goals * 100).toFixed(0) + '% goals');
@@ -736,7 +739,7 @@ section('7. goalkeepers');
   m2.state = 'PLAY';
   var gk2 = m2.home[3];
   m2.all.forEach(function (p) { if (p !== gk2) place(p, 30, 30); });
-  place(gk2, 0, 21.2, Math.PI);
+  place(gk2, 0, GL - 0.8, Math.PI);
   giveBall(m2, gk2);
   var mateA = m2.home[0], mateB = m2.home[1];
   place(mateA, 0, 12, Math.PI);       // close to the keeper...
@@ -763,10 +766,10 @@ section('7. goalkeepers');
       if (p.isGoalkeeper) { m.repositionGoalkeeper(p); return; }
       place(p, 40, 40);
     });
-    gk.x = 0; gk.z = -21.2;
+    gk.x = 0; gk.z = -(GL - 0.8);
     // isolate the PHYSICAL block: disable the reflex roll for this measurement
     m.keeperSaveChance = function () { return 0; };
-    m.ball.reset(0, -8);
+    m.ball.reset(0, -(GL - 14));
     m.ball.vx = 0; m.ball.vz = -30;         // bang it straight at the keeper
     m.ball.lastKicker = m.home[2];
     m.ball._kickSeq++;
@@ -777,7 +780,7 @@ section('7. goalkeepers');
       if (m.state === 'GOAL') { out = 'goal'; break; }
       if (gk.hasBall) { out = 'caught'; break; }
       if (m.ball.vz > 0.5) { out = stopped ? 'parried' : 'blocked'; break; }
-      if (m.ball.z < -22.4) { out = 'net'; break; }
+      if (m.ball.z < -(GL + 0.4)) { out = 'net'; break; }
     }
     return out;
   }
@@ -797,9 +800,9 @@ section('7. goalkeepers');
       if (p.isGoalkeeper) { m.repositionGoalkeeper(p); return; }
       place(p, 40, 40);
     });
-    gk.x = 0; gk.z = -21.2;
+    gk.x = 0; gk.z = -(GL - 0.8);
     m.keeperSaveChance = function () { return 0; };
-    var z0 = -8, z1 = -22.2;
+    var z0 = -(GL - 14), z1 = -(GL + 0.2);
     var dx = aimX, dz = z1 - z0, d = Math.sqrt(dx * dx + dz * dz);
     m.ball.reset(0, z0);
     m.ball.vx = dx / d * 30; m.ball.vz = dz / d * 30;
@@ -830,10 +833,10 @@ section('7. goalkeepers');
     // park the defending keeper safely out of the lane so the "own goal" test
     // measures goal detection, not whether a keeper can parry
     var homeGk = m.home[3], awayGk = m.away[3];
-    place(homeGk, 3, 21.2, Math.PI);
-    place(awayGk, 3, -21.2, 0);
+    place(homeGk, 3, GL - 0.8, Math.PI);
+    place(awayGk, 3, -(GL - 0.8), 0);
     m.keeperSaveChance = function () { return 0; };
-    var z0 = owningTeam === 0 ? 19.5 : -19.5;
+    var z0 = owningTeam === 0 ? (GL - 2.5) : -(GL - 2.5);
     var vz = owningTeam === 0 ? 30 : -30;
     m.ball.reset(0, z0);
     m.ball.vx = 0; m.ball.vz = vz;
@@ -871,10 +874,10 @@ section('7. goalkeepers');
   var pkGoals = [];
   pk.bus.on('goal', function (e) { pkGoals.push(e); });
   pk.all.forEach(function (p) { p.ai = null; place(p, 40, 40); });
-  place(pk.home[3], 3, 21.2, Math.PI);
-  place(pk.away[3], 3, -21.2, 0);
+  place(pk.home[3], 3, GL - 0.8, Math.PI);
+  place(pk.away[3], 3, -(GL - 0.8), 0);
   pk.keeperSaveChance = function () { return 0; };
-  pk.ball.reset(0, -19.5);
+  pk.ball.reset(0, -(GL - 2.5));
   pk.ball.vx = 0; pk.ball.vz = -30;
   pk.ball.lastKicker = pk.away[3];     // the AWAY keeper's parry
   pk.ball._kickSeq++;
@@ -890,10 +893,10 @@ section('7. goalkeepers');
   var ngGoals = [];
   ng.bus.on('goal', function (e) { ngGoals.push(e); });
   ng.all.forEach(function (p) { p.ai = null; place(p, 40, 40); });
-  place(ng.home[3], 3, 21.2, Math.PI);
-  place(ng.away[3], 3, -21.2, 0);
+  place(ng.home[3], 3, GL - 0.8, Math.PI);
+  place(ng.away[3], 3, -(GL - 0.8), 0);
   ng.keeperSaveChance = function () { return 0; };
-  ng.ball.reset(0, 19.5);
+  ng.ball.reset(0, GL - 2.5);
   ng.ball.vx = 0; ng.ball.vz = 30;
   ng.ball.lastKicker = ng.away[2];     // an AWAY striker hits the HOME net
   ng.ball._kickSeq++;
@@ -1140,8 +1143,8 @@ section('11. difficulty — the level actually changes the AI');
     var m = resetProbe(pmHold);
     var h = m.home[0];
     m.all.forEach(function (p) { place(p, 30, 30); });
-    m.home[3].x = 0; m.home[3].z = 21.5;
-    m.away[3].x = 0; m.away[3].z = -21.5;
+    m.home[3].x = 0; m.home[3].z = GL - 0.5;
+    m.away[3].x = 0; m.away[3].z = -(GL - 0.5);
     place(h, 0, 0, Math.PI);
     giveBall(m, h);
     // three opponents converge on a carrier who is shielding the ball
@@ -1303,9 +1306,9 @@ section('11. difficulty — the level actually changes the AI');
       m.all.forEach(function (p) { if (!p.isGoalkeeper) place(p, -12.5, -20.5); });
       m.repositionGoalkeeper(m.home[3]);
       m.repositionGoalkeeper(gk);
-      gk.x = 0; gk.z = -21.2;
+      gk.x = 0; gk.z = -(GL - 0.8);
       gk._saveSig = null;
-      var fromZ = -8, z1 = -22.2;
+      var fromZ = -(GL - 14), z1 = -(GL + 0.2);
       var dx = (i % 2 ? 1 : -1) * (1.55 + (i / N) * 0.95);
       var dz = z1 - fromZ;
       var d = Math.sqrt(dx * dx + dz * dz), speed = 30;
@@ -1525,7 +1528,7 @@ section('13. goalkeeper distribution reaches the chosen teammate');
       p.want.x = 0; p.want.z = 0;
       place(p, -12.5, -20.5);        // a legal far corner: never off the pitch
     });
-    place(gk, 0, 21.2, Math.PI);
+    place(gk, 0, GL - 0.8, Math.PI);
     giveBall(m, gk);
     place(mateA, -4, 12, Math.PI);            // the close outlet
     place(mateB, opts.longBall ? 0 : 9, opts.longBall ? 1 : 4, Math.PI);
@@ -1615,7 +1618,7 @@ section('13b. keeper distribution ethics — never to an opponent, clear to spac
       if (p !== gk) p.ai = null;
       place(p, 30, 30);
     });
-    place(gk, 0, 21.2, Math.PI);
+    place(gk, 0, GL - 0.8, Math.PI);
     giveBall(m, gk);
     var mates = m.home.filter(function (p) { return !p.isGoalkeeper; });
     var opps = m.away.filter(function (p) { return !p.isGoalkeeper; });
@@ -1653,7 +1656,7 @@ section('13b. keeper distribution ethics — never to an opponent, clear to spac
     m.state = 'PLAY';
     var gk = m.home[3];
     m.all.forEach(function (p) { if (p !== gk) place(p, Math.random() * 20 - 10, Math.random() * 16 - 5); });
-    place(gk, 0, 21.2, Math.PI);
+    place(gk, 0, GL - 0.8, Math.PI);
     giveBall(m, gk);
     gk.distributeT = 0;
     gk.ai.distribute();
@@ -1774,7 +1777,7 @@ section('14. LANDSCAPE input: the stick drives the world from the east-side came
   var h = m.active;
   m.all.forEach(function (o) {
     if (o === h) return;
-    if (o.isGoalkeeper) { o.x = 0; o.z = o.team === 0 ? 21.5 : -21.5; return; }
+    if (o.isGoalkeeper) { o.x = 0; o.z = o.team === 0 ? (GL - 0.5) : -(GL - 0.5); return; }
     place(o, 40, 40);
   });
   place(h, 0, 8, Math.PI);
@@ -1833,7 +1836,8 @@ section('15. assists + finalize-once bookkeeping (no RNG in the credit path)');
   giveBall(m, b);
   place(b, 0, -LG.Config.court.length / 2 - 0.4, 0);
   m.ball.x = 0;
-  m.ball.z = -LG.Config.court.length / 2 - 0.05;
+  m.ball.z = -LG.Config.court.length / 2 - 0.4;   // all of it over the line
+  m.ball._inGoal = -1;                             // (entered through the mouth)
   m.ball.y = 0.15;
   m.ball.vz = -4;
   m.ball.lastKicker = b;
@@ -1860,7 +1864,8 @@ section('15. assists + finalize-once bookkeeping (no RNG in the credit path)');
   giveBall(m, b);
   place(b, 0, -LG.Config.court.length / 2 - 0.4, 0);
   m.ball.x = 0;
-  m.ball.z = -LG.Config.court.length / 2 - 0.05;
+  m.ball.z = -LG.Config.court.length / 2 - 0.4;   // all of it over the line
+  m.ball._inGoal = -1;                             // (entered through the mouth)
   m.ball.y = 0.15;
   m.ball.lastKicker = b;
   m._ballPrevZ = -LG.Config.court.length / 2 + 0.4;
@@ -2367,7 +2372,7 @@ section('Build 6. the CPU side fires its special moves');
   assert(A.moment(m, cpu, 'FREEZE'), 'ICE GRIP fires when they bear down on goal');
   place(me, 0, 14);
   assert(!A.moment(m, cpu, 'SUPER_TACKLE'), 'no BLOCKBUSTER when the carrier is far away');
-  giveBall(m, cpu); place(cpu, 0, 8);   // attacking +z
+  giveBall(m, cpu); place(cpu, 0, hl - 9);    // attacking +z, ~10m out (in range for any shooter)
   m.home.forEach(function (p) { if (!p.isGoalkeeper) place(p, 12, -12); });
   assert(A.moment(m, cpu, 'POWER_SHOT'), 'POWER SHOT fires in range of goal');
   place(cpu, 0, -6);
@@ -2391,6 +2396,396 @@ section('Build 6. the CPU side fires its special moves');
     assert(used >= 2, lvl + ': the CPU fired special moves in play', used);
     assert(mine === 0, lvl + ': it never fires the human side\'s moves', mine);
   });
+  LG.Difficulty.set('medium');
+})();
+
+// ============================================================
+section('Build 8a. goal detection — the goal is a physical object');
+(function () {
+  var C = LG.Config.court, gw = C.goalWidth / 2, r = LG.Config.court.ballRadius;
+  // a clean end: AI off, keepers parked out of the way, no save roll
+  function lab() {
+    var m = newMatch(); m.start(); m.state = 'PLAY';
+    m.all.forEach(function (p) { p.ai = null; p.isHuman = false; place(p, 0, 0); });
+    place(m.home[3], 10, GL - 2); place(m.away[3], 10, -(GL - 2));
+    m.keeperSaveChance = function () { return 0; };
+    m.updateKeepers = function () {};
+    var ev = { goals: 0, posts: 0, nets: 0 };
+    m.bus.on('goal', function () { ev.goals++; });
+    if (LG.eventBus && LG.eventBus.on) {
+      LG.eventBus.on('postHit', function () { if (LG.Match === m) ev.posts++; });
+      LG.eventBus.on('netHit', function () { if (LG.Match === m) ev.nets++; });
+    }
+    m.ev = ev;
+    return m;
+  }
+  // fly a ball through the real loop; keep the state at PLAY so a second
+  // (duplicate) goal would be visible if the latch failed
+  function fly(m, x, y, z, vx, vy, vz, frames, dt) {
+    m.ball.reset(x, z); m.ball.y = y; m.ball.atRest = false;
+    m.ball.vx = vx; m.ball.vy = vy; m.ball.vz = vz;
+    m.ball.lastKicker = m.home[0]; m.ball._kickSeq++;
+    var deepest = 0, outsideDeep = 0, maxIn = 0;
+    for (var i = 0; i < (frames || 120); i++) {
+      m.state = 'PLAY'; m.stateT = 5; m.clock = 100;
+      m.update(dt || 1 / 60);
+      var zr = -m.ball.z;                       // depth toward the north goal
+      if (zr > deepest) deepest = zr;
+      if (Math.abs(m.ball.x) > gw && zr > GL - r + 0.02) outsideDeep++;
+      if (m.ball._inGoal) maxIn = 1;
+    }
+    return { goals: m.ev.goals, deepest: deepest, outsideDeep: outsideDeep, inGoal: maxIn, ball: m.ball };
+  }
+  var a = lab(), legit = fly(a, 0, r, -(GL - 6), 0.4, 0.5, -20);
+  assert(legit.goals === 1, 'a shot into the middle of the goal is ONE goal', legit.goals);
+  assert(legit.deepest > GL + r, 'the goal only counts with the whole ball over the line', legit.deepest.toFixed(2));
+  assert(legit.deepest < GL + C.goalDepth, 'the back net stops the ball inside the goal', legit.deepest.toFixed(2));
+
+  var b = lab(), side = fly(b, gw + 0.55, r, -(GL - 5), 0.6, 0.3, -14);
+  assert(side.goals === 0, 'a ball just outside the post into the side netting is NOT a goal', side.goals);
+  assert(side.outsideDeep === 0 && !side.inGoal, 'it never gets behind the line outside the frame', side.outsideDeep);
+
+  var c = lab(), along = fly(c, 9, r, -(GL - r - 0.01), -13, 0, -0.6, 150);
+  assert(along.goals === 0, 'a ball running along the end line across the mouth is not a goal', along.goals);
+
+  var d = lab(), over = fly(d, 0.5, 2.6, -(GL - 5), 0, 1.2, -18);
+  assert(over.goals === 0 && !over.inGoal, 'a shot over the crossbar bounces off the fence — never drops into the net', over.goals);
+
+  var e = lab(), post = fly(e, gw, r, -(GL - 6), 0, 0, -18);
+  assert(post.goals === 0 && e.ev.posts >= 1, 'a ball onto the post comes back out (and rings the woodwork)', JSON.stringify({ g: post.goals, posts: e.ev.posts }));
+  var f = lab(), bar = fly(f, 0, C.goalHeight, -(GL - 1.2), 0, 0, -14, 40);
+  assert(bar.goals === 0 && f.ev.posts >= 1, 'a ball onto the crossbar comes back out', JSON.stringify({ g: bar.goals, bar: f.ev.posts }));
+
+  var g = lab(), dup = fly(g, 0, r, -(GL - 4), 0, 0.2, -30, 200);
+  assert(dup.goals === 1, 'a rocket into the back net, left bouncing for seconds, scores exactly once', dup.goals);
+  assert(g.ev.nets >= 1, 'the back net is hit (and rippled) without a second goal', g.ev.nets);
+
+  // fast balls on a coarse frame: inside the post goes in, outside never tunnels
+  var h = lab(), fastIn = fly(h, 0, r, -(GL - 10), (gw - 0.55) / 10 * 36, 0.2, -36, 60, 1 / 20);
+  assert(fastIn.goals === 1, 'a 36 m/s strike just inside the post at 20 fps is a goal', fastIn.goals);
+  var k = lab(), fastOut = fly(k, 0, r, -(GL - 10), (gw + 0.45) / 10 * 36, 0.2, -36, 60, 1 / 20);
+  assert(fastOut.goals === 0 && fastOut.outsideDeep === 0, 'a 36 m/s strike just outside the post at 20 fps never tunnels in', JSON.stringify({ g: fastOut.goals, deep: fastOut.outsideDeep }));
+
+  // a deflection that turns a wide ball goalward is a single, credited goal
+  var q = lab();
+  q.ball.reset(-6, -(GL - 6)); q.ball.vx = -2; q.ball.vz = -12; q.ball.lastKicker = q.home[1]; q.ball._kickSeq++;
+  for (var i = 0; i < 12; i++) { q.state = 'PLAY'; q.update(1 / 60); }
+  q.ball.vx = 14; q.ball.vz = -10; q.ball.lastKicker = q.away[0];       // a defender's touch
+  var defl = 0; q.bus.on('goal', function (ev) { defl++; q._lastGoal = ev; });
+  for (i = 0; i < 120; i++) { q.state = 'PLAY'; q.stateT = 5; q.update(1 / 60); }
+  assert(q.ev.goals === 1 && q._lastGoal && q._lastGoal.isOwnGoal === true, 'a deflection into the net is one goal (an own goal for the defender)', JSON.stringify({ g: q.ev.goals }));
+
+  // the outside of the net cannot score: a ball behind the line outside the
+  // frame (only reachable by being placed there) is never judged a goal
+  var o = lab();
+  o.ball.reset(gw + 0.6, -(GL + 1)); o.ball.vx = -4; o.ball.vz = 0;
+  o.ball._inGoal = 0;
+  assert(LG.GoalFrame.judge(o.ball) === null, 'a ball against the OUTSIDE of the side netting is never a goal');
+
+  // a carrier dribbling into the side netting beside the post cannot push
+  // the ball through it (the old carried-ball goal)
+  var cm = lab(), cr = cm.home[0];
+  place(cr, gw + 0.4, -(GL - 1.0), Math.PI);
+  giveBall(cm, cr);
+  var leaked = 0;
+  for (i = 0; i < 150; i++) {
+    cr.want.x = 0.08; cr.want.z = -1;      // shoving it at the netting, not into the mouth
+    cm.state = 'PLAY'; cm.update(1 / 60);
+    if (Math.abs(cm.ball.x) > gw - 0.07 - r * 0.5 && -cm.ball.z > GL - r + 0.02 && !cm.ball._inGoal) leaked++;
+  }
+  assert(cm.ev.goals === 0 && leaked === 0, 'dribbling into the side netting beside the post never scores', JSON.stringify({ g: cm.ev.goals, leaked: leaked }));
+  // ...while walking it in through the mouth still does
+  var wm = lab(), wr = wm.home[0];
+  place(wr, 0, -(GL - 2.0), Math.PI);
+  giveBall(wm, wr);
+  for (i = 0; i < 150 && wm.ev.goals === 0; i++) { wr.want.x = 0; wr.want.z = -1; wm.state = 'PLAY'; wm.update(1 / 60); }
+  assert(wm.ev.goals === 1, 'walking the ball in through the mouth is a goal', wm.ev.goals);
+})();
+
+// ============================================================
+section('Build 8b. goalkeepers — position, react, recover, claim, close down');
+(function () {
+  var K = LG.Config.keeper;
+  function lab(level) {
+    LG.Difficulty.set(level || 'medium');
+    var m = newMatch(); m.start(); m.state = 'PLAY';
+    m.all.forEach(function (p) { if (!p.isGoalkeeper) { p.ai = null; p.isHuman = false; place(p, -14, 0); } });
+    var gk = m.away[3];   // the ROGUE keeper (defends -z)
+    m.repositionGoalkeeper(gk);
+    return { m: m, gk: gk, off: function () { return gk.ai.off(gk.z); } };
+  }
+  function run(L, n, fn) { for (var i = 0; i < n; i++) { if (fn) fn(i); L.m.state = 'PLAY'; L.m.clock = 100; L.m.update(1 / 60); } }
+
+  // an attacker comes straight at goal: he narrows the angle, never leaves the box
+  var A = lab(), at = A.m.home[0], maxOff = 0, maxX = 0, offAt12 = 0;
+  place(at, 0.5, -(GL - 17), Math.PI); giveBall(A.m, at);
+  run(A, 150, function (i) {
+    at.want.x = 0; at.want.z = -0.7;
+    maxOff = Math.max(maxOff, A.off()); maxX = Math.max(maxX, Math.abs(A.gk.x));
+    if (i === 60) offAt12 = A.off();
+  });
+  info('attacker running at goal: keeper off the line ' + offAt12.toFixed(2) + 'm at mid-run, max ' + maxOff.toFixed(2) + 'm, max |x| ' + maxX.toFixed(2));
+  assert(offAt12 > 1.0, 'the keeper comes off his line to narrow the angle', offAt12.toFixed(2));
+  assert(maxOff < K.rushMax + 0.4 && maxX < K.areaW, 'he never wanders out of his box', maxOff.toFixed(2) + 'm / |x| ' + maxX.toFixed(2));
+
+  // a striker through on goal: he comes out and goes down at his feet
+  var smothers = 0, rounded = 0, T = 40;
+  for (var t = 0; t < T; t++) {
+    var B = lab(), st = B.m.home[0];
+    place(st, (t % 2 ? 1 : -1) * 1.2, -(GL - 8), Math.PI); giveBall(B.m, st);
+    var got = false;
+    run(B, 150, function () { if (!got) { st.want.x = 0; st.want.z = -0.55; } if (B.gk.hasBall) got = true; });
+    if (got) smothers++; else rounded++;
+  }
+  info('1v1 from 8m (striker jogging in, no shot): keeper won it ' + smothers + '/' + T);
+  assert(smothers > T * 0.15 && smothers < T * 0.95, 'a 1v1 is a contest: the keeper wins some, not all', smothers + '/' + T);
+
+  // the attacker goes round him: he gets up and recovers to his goal
+  var R = lab(), rs = R.m.home[0];
+  place(rs, 0, -(GL - 7), Math.PI); giveBall(R.m, rs);
+  run(R, 40, function () { rs.want.x = 0; rs.want.z = -0.5; });
+  R.gk.ai.downT = 0; R.gk.ai.smotherCd = 5;          // say he missed it
+  var rec = null;
+  run(R, 150, function (i) {
+    rs.want.x = 1; rs.want.z = -0.15;                 // cut wide round him
+    if (rec === null && R.gk.ai.state !== 'rush' && i > 10) rec = i;
+  });
+  var gx = R.gk.x, goff = R.off();
+  info('rounded keeper after 2.5s: off ' + goff.toFixed(2) + 'm, x ' + gx.toFixed(2) + ' (carrier at x ' + rs.x.toFixed(1) + ')');
+  assert(goff < 2.6 && gx > 0.3, 'once rounded he recovers toward the goal on the ball side', goff.toFixed(2) + 'm, x ' + gx.toFixed(2));
+
+  // a ball played across / behind him: he tracks to the far side
+  var P = lab(), runner = P.m.home[1];
+  place(runner, -3.5, -(GL - 6), Math.PI);
+  P.m.ball.reset(7, -(GL - 4)); P.m.ball.vx = -15; P.m.ball.vz = -1.2; P.m.ball.lastKicker = P.m.home[2]; P.m.ball._kickSeq++;
+  var sawClaim = false, minX = 9;
+  run(P, 50, function () { runner.want.x = 0; runner.want.z = -0.3; if (P.gk.ai.state === 'claim') sawClaim = true; minX = Math.min(minX, P.gk.x); });
+  info('square ball across the box: keeper reached x=' + minX.toFixed(2) + (P.gk.hasBall ? ' and claimed it' : '') + ' (claim ' + sawClaim + ')');
+  assert(P.gk.hasBall || minX < -0.8, 'a ball across the face is claimed or tracked to the far side', minX.toFixed(2));
+
+  // no runner at all: a ball rolling through his box is his
+  var P2 = lab();
+  P2.m.ball.reset(5, -(GL - 7)); P2.m.ball.vx = -5; P2.m.ball.vz = -3; P2.m.ball.lastKicker = P2.m.home[2]; P2.m.ball._kickSeq++;
+  run(P2, 120, function () {});
+  assert(P2.gk.hasBall, 'a loose ball rolling through his box with nobody near is claimed', P2.gk.state);
+
+  // recovery: pulled out wide and high, he gets back into position quickly
+  var Q = lab();
+  place(Q.gk, 5, -(GL - 6), 0);
+  Q.m.ball.reset(0, 4);
+  var back = -1;
+  run(Q, 240, function (i) { if (back < 0 && Q.off() < 2.6 && Math.abs(Q.gk.x) < 1.2) back = i; });
+  info('keeper 6m out and 5m wide: back in position after ' + (back / 60).toFixed(2) + 's');
+  assert(back > 0 && back < 150, 'a keeper out of position recovers to his set point in under 2.5s', (back / 60).toFixed(2) + 's');
+
+  // fast shots to either corner: both corners are beatable, neither is a gift
+  function cornerRate(sideSign, N) {
+    var g = 0;
+    for (var i = 0; i < N; i++) {
+      var L = lab();
+      var z0 = -(GL - 13), aim = sideSign * (1.75 + (i % 5) * 0.15), z1 = -(GL + 0.2);
+      var dx = aim, dz = z1 - z0, dd = Math.sqrt(dx * dx + dz * dz);
+      L.m.ball.reset(0, z0); L.m.ball.vx = dx / dd * 29; L.m.ball.vz = dz / dd * 29; L.m.ball.vy = 0.6;
+      L.m.ball.lastKicker = L.m.home[2]; L.m.ball._kickSeq = 1000 + i * 7;   // a different kick each time (the keeper's read varies per kick)
+      for (var k = 0; k < 90; k++) { L.m.state = 'PLAY'; L.m.update(1 / 60); if (L.m.state === 'GOAL') { g++; break; } if (L.gk.hasBall || L.m.ball.vz > 0.5) break; }
+    }
+    return g / N;
+  }
+  var leftR = cornerRate(-1, 60), rightR = cornerRate(1, 60);
+  info('29 m/s shots from 13m into the corners: left ' + (leftR * 100).toFixed(0) + '% / right ' + (rightR * 100).toFixed(0) + '% scored');
+  assert(leftR > 0.1 && leftR < 0.8 && rightR > 0.1 && rightR < 0.8, 'corner shots beat the keeper sometimes, not always', (leftR * 100).toFixed(0) + '% / ' + (rightR * 100).toFixed(0) + '%');
+  assert(Math.abs(leftR - rightR) < 0.3, 'neither corner is a blind spot', (leftR * 100).toFixed(0) + '% vs ' + (rightR * 100).toFixed(0) + '%');
+
+  // close range: a 5m finish beats him more often than not
+  var cg = 0;
+  for (var c2 = 0; c2 < 40; c2++) {
+    var L2 = lab(), z0 = -(GL - 5), aim2 = (c2 % 2 ? 1 : -1) * 1.6, dz2 = -(GL + 0.2) - z0, dd2 = Math.sqrt(aim2 * aim2 + dz2 * dz2);
+    L2.m.ball.reset(0.3, z0); L2.m.ball.vx = aim2 / dd2 * 24; L2.m.ball.vz = dz2 / dd2 * 24; L2.m.ball.lastKicker = L2.m.home[2]; L2.m.ball._kickSeq++;
+    for (var k2 = 0; k2 < 60; k2++) { L2.m.state = 'PLAY'; L2.m.update(1 / 60); if (L2.m.state === 'GOAL') { cg++; break; } if (L2.gk.hasBall || L2.m.ball.vz > 0.5) break; }
+  }
+  info('5m placed finishes: ' + (cg / 40 * 100).toFixed(0) + '% scored');
+  assert(cg / 40 > 0.4, 'close-range placed finishes mostly beat the keeper', (cg / 40 * 100).toFixed(0) + '%');
+
+  // over a whole CPU match the ROGUE keeper never wanders off: his distance
+  // off the line stays inside his box every frame
+  LG.Difficulty.set('medium');
+  var mm = newMatch(); mm.start(); mm.activatePlayer = function () {};
+  mm.home.forEach(function (p) { p.isHuman = false; if (!p.ai) p.ai = p.isGoalkeeper ? new LG.KeeperBrain(p) : new LG.AIBrain(p); });
+  var rg = mm.away[3], worst = 0, over3 = 0, frames = 0;
+  for (var f = 0; f < 60 * 90; f++) {
+    mm.update(1 / 60);
+    if (mm.state !== 'PLAY') continue;
+    frames++;
+    var o = rg.ai.off(rg.z);
+    worst = Math.max(worst, o);
+    if (o > 3) over3++;
+  }
+  info('ROGUE keeper over 90s of CPU play: furthest off the line ' + worst.toFixed(2) + 'm, ' + (over3 / frames * 100).toFixed(1) + '% of play more than 3m out');
+  assert(worst < K.rushMax + 0.6, 'the ROGUE keeper never wanders beyond his box', worst.toFixed(2) + 'm');
+  assert(over3 / frames < 0.12, 'and spends almost all of the game near his line', (over3 / frames * 100).toFixed(1) + '%');
+})();
+
+// ============================================================
+section('Build 8c. keeper possession — secure, decide, distribute, protected');
+(function () {
+  var K = LG.Config.keeper;
+  function lab(setup) {
+    LG.Difficulty.set('medium');
+    var m = newMatch(); m.start(); m.state = 'PLAY';
+    m.all.forEach(function (p) { if (!p.isGoalkeeper) { p.ai = null; p.isHuman = false; } });
+    var gk = m.home[3];
+    m.repositionGoalkeeper(gk);
+    if (setup) setup(m, gk);
+    giveBall(m, gk);
+    return { m: m, gk: gk };
+  }
+  function park(m, team, pts) { var outs = m.teamPlayers(team).filter(function (p) { return !p.isGoalkeeper; }); outs.forEach(function (p, i) { var q = pts[i] || [-14, 0]; place(p, q[0], q[1], 0); }); }
+
+  // the sequence: secure -> decide -> windup -> released, once, no jitter
+  var A = lab(function (m) { park(m, 0, [[-4, GL - 8], [6, GL - 14], [0, GL - 24]]); park(m, 1, [[13, -10], [-13, -12], [12, -20]]); });
+  var seq = [], last = null, frames = 0, maxV = 0, maxTurn = 0, f0 = A.gk.facing, released = -1, kind = null;
+  A.m.bus.on('keeperDistribute', function (e) { kind = e.kind; });
+  for (var i = 0; i < 400; i++) {
+    A.m.state = 'PLAY'; A.m.clock = 100; A.m.update(1 / 60);
+    var st = A.gk.ai.poss && A.gk.hasBall ? A.gk.ai.poss.st : null;
+    if (st && st !== last) { seq.push(st); last = st; }
+    if (A.gk.hasBall) {
+      maxV = Math.max(maxV, Math.sqrt(A.gk.vx * A.gk.vx + A.gk.vz * A.gk.vz));
+      var dF = Math.abs(Math.atan2(Math.sin(A.gk.facing - f0), Math.cos(A.gk.facing - f0))); maxTurn = Math.max(maxTurn, dF); f0 = A.gk.facing;
+    } else if (released < 0) { released = i; break; }
+  }
+  info('keeper possession: ' + seq.join(' -> ') + ' -> released after ' + (released / 60).toFixed(2) + 's (' + kind + '), max walk ' + maxV.toFixed(2) + ' m/s, max turn/frame ' + maxTurn.toFixed(3));
+  assert(seq.join(',') === 'secure,decide,windup', 'a held ball goes secure -> decide -> windup, each once', seq.join(','));
+  assert(released / 60 >= K.secureT + K.decideMin && released / 60 <= K.holdMax + K.windupT + 0.3, 'he takes a beat to look up, but never dawdles', (released / 60).toFixed(2) + 's');
+  assert(maxV < 1.8 && maxTurn < 0.26, 'composed: no running, no snapping round while he holds it', maxV.toFixed(2) + ' m/s, ' + maxTurn.toFixed(3) + ' rad/frame');
+  assert(kind === 'roll' || kind === 'throw', 'a free defender close by gets it rolled / thrown out', kind);
+
+  // protection: an opponent in his face cannot tackle, and is eased out
+  var B = lab(function (m) { park(m, 0, [[-4, GL - 10], [6, GL - 14], [0, GL - 24]]); park(m, 1, [[0.3, GL - 1.6], [-13, -12], [12, -20]]); });
+  var opp = B.m.away[0], won = 0;
+  for (i = 0; i < 25; i++) {
+    B.m.state = 'PLAY'; B.m.update(1 / 60);
+    opp.tackleCd = 0; B.m.tryTackle(opp, { accuracy: 2 });
+    if (!B.gk.hasBall) { won++; break; }
+    if (!B.gk._gkProtected) break;
+  }
+  var gap = opp.distTo(B.gk.x, B.gk.z);
+  assert(won === 0, 'a secured keeper cannot be tackled, however hard they try', won);
+  assert(gap > K.protectR - 0.25, 'an opponent standing on him is eased out of the protection bubble', gap.toFixed(2) + 'm');
+
+  // AI opponents keep the protect radius in their own steering
+  var C2 = lab(function (m) { park(m, 0, [[-4, GL - 10], [6, GL - 14], [0, GL - 24]]); park(m, 1, [[1, GL - 4], [-2, GL - 5], [3, GL - 7]]); });
+  C2.m.away.forEach(function (p) { if (!p.isGoalkeeper) p.ai = new LG.AIBrain(p); });
+  var minGap = 99;
+  for (i = 0; i < 60; i++) {
+    C2.m.state = 'PLAY'; C2.m.update(1 / 60);
+    if (!C2.gk._gkProtected) break;
+    C2.m.away.forEach(function (p) { if (!p.isGoalkeeper && i > 30) minGap = Math.min(minGap, p.distTo(C2.gk.x, C2.gk.z)); });
+  }
+  info('CPU opponents around a protected keeper: closest ' + minGap.toFixed(2) + 'm');
+  assert(minGap > K.protectR - 0.2, 'CPU attackers back off and let him distribute', minGap.toFixed(2) + 'm');
+
+  // NOT protected: a ball he only parries, or one he picks up out of his box
+  var D = lab();
+  D.m.release(D.gk);
+  assert(!D.m.keeperProtected(D.gk), 'a keeper without the ball (a parry, a fumble) is not protected');
+  var E = lab(function (m, gk) { place(gk, 0, GL - 12, Math.PI); });
+  E.m.state = 'PLAY'; E.m.update(1 / 60);
+  assert(!E.gk._gkProtected, 'a ball picked up outside his box is a normal loose-ball touch', E.gk._gkProtected);
+
+  // distribution intelligence: the restart depends on the situation
+  function kindFor(setup) {
+    var L = lab(setup), k = null, tg = null;
+    L.m.bus.on('keeperDistribute', function (e) { k = e.kind; tg = e.target; });
+    for (var j = 0; j < 400 && L.gk.hasBall; j++) { L.m.state = 'PLAY'; L.m.clock = 100; L.m.update(1 / 60); }
+    return { kind: k, target: tg };
+  }
+  var press = kindFor(function (m) {
+    park(m, 0, [[-4, GL - 8], [5, GL - 9], [0, GL - 13]]);
+    park(m, 1, [[-4.6, GL - 8.6], [5.6, GL - 9.6], [0.6, GL - 13.4]]);   // every mate marked
+  });
+  assert(press.kind === 'clear' && !press.target, 'every outlet marked -> he clears it, never gifts a pass', press.kind);
+  var longB = kindFor(function (m) {
+    park(m, 0, [[-4, GL - 7], [4, GL - 7], [0, GL - 24]]);
+    park(m, 1, [[-4.5, GL - 7.6], [4.5, GL - 7.6], [9, -6]]);           // short men marked, runner free
+  });
+  assert(longB.kind === 'kick' && longB.target, 'short men marked, a runner free upfield -> the long ball', longB.kind);
+})();
+
+// ============================================================
+section('Build 8d. ROGUE attack — real chances, real misses, levels intact');
+(function () {
+  // a ROGUE forward in a good spot actually pulls the trigger, at a corner
+  LG.Difficulty.set('medium');
+  var m = newMatch(); m.start(); m.state = 'PLAY';
+  m.all.forEach(function (p) { if (!p.isGoalkeeper) { p.isHuman = false; p.ai = null; place(p, -14, 0); } });
+  m.repositionGoalkeeper(m.home[3]);
+  var fw = m.away[2]; fw.ai = new LG.AIBrain(fw);
+  place(fw, 1.0, GL - 9, 0); giveBall(m, fw);
+  var shot = null;
+  var orig = m.shootDirect;
+  m.shootDirect = function (p, power, goal, opts) { shot = { opts: opts, p: p }; return orig.apply(this, arguments); };
+  for (var i = 0; i < 120 && !shot; i++) { m.state = 'PLAY'; m.update(1 / 60); }
+  assert(!!shot, 'a ROGUE striker 9m out with a clear sight of goal shoots', shot ? 'shot' : 'no shot in 2s');
+  assert(shot && shot.opts && shot.opts.target && Math.abs(shot.opts.target.x) > 1, 'and he aims for a corner, away from the keeper', shot && shot.opts && shot.opts.target ? shot.opts.target.x.toFixed(2) : '-');
+
+  // from 24 m out he does not blaze away
+  var m2 = newMatch(); m2.start(); m2.state = 'PLAY';
+  m2.all.forEach(function (p) { if (!p.isGoalkeeper) { p.isHuman = false; p.ai = null; place(p, -14, 0); } });
+  var lf = m2.away[2]; lf.ai = new LG.AIBrain(lf);
+  place(lf, 0, GL - 24, 0); giveBall(m2, lf);
+  var far = 0; var o2 = m2.shootDirect; m2.shootDirect = function () { far++; return o2.apply(this, arguments); };
+  for (i = 0; i < 60; i++) { m2.state = 'PLAY'; m2.update(1 / 60); }
+  assert(far === 0, 'no hopeful shots from 24m', far);
+
+  // CPU vs CPU full matches on each level: ROGUE scores sometimes, misses more
+  function level(lvl, N) {
+    LG.Difficulty.set(lvl);
+    var g1 = 0, s1 = 0;
+    for (var k = 0; k < N; k++) {
+      var mm = newMatch(); mm.start(); mm.activatePlayer = function () {};
+      mm.home.forEach(function (p) { p.isHuman = false; if (!p.ai) p.ai = p.isGoalkeeper ? new LG.KeeperBrain(p) : new LG.AIBrain(p); });
+      var o3 = mm.shootDirect; mm.shootDirect = function (p) { if (p.team === 1) s1++; return o3.apply(this, arguments); };
+      for (var f = 0; f < 60 * 120; f++) { mm.update(1 / 60); if (mm.state === 'END') break; }
+      g1 += mm.score[1];
+    }
+    return { goals: g1 / N, shots: s1 / N };
+  }
+  var N = 5, E = level('easy', N), M = level('medium', N), H = level('hard', N);
+  info('ROGUE per 2:00 vs a CPU home side — easy ' + E.goals.toFixed(1) + ' goals / ' + E.shots.toFixed(1) + ' shots, medium ' +
+    M.goals.toFixed(1) + ' / ' + M.shots.toFixed(1) + ', hard ' + H.goals.toFixed(1) + ' / ' + H.shots.toFixed(1));
+  assert(M.goals + H.goals > 0, 'the ROGUE side converts chances', (M.goals + H.goals).toFixed(1));
+  assert(M.goals < 2.5 && H.goals < 3, 'but does not score at will', M.goals.toFixed(1) + ' / ' + H.goals.toFixed(1));
+  assert(M.shots > M.goals * 2 && H.shots > H.goals * 2, 'most of its shots are saved, blocked or missed', M.shots.toFixed(1) + ' shots for ' + M.goals.toFixed(1));
+  assert(E.shots < M.shots && M.shots <= H.shots + 1, 'the levels still differ: EASY creates least, HARD most', E.shots.toFixed(1) + ' < ' + M.shots.toFixed(1) + ' <= ' + H.shots.toFixed(1));
+  LG.Difficulty.set('medium');
+})();
+
+// ============================================================
+section('Build 8e. the bigger court — everybody respects the new cage');
+(function () {
+  var C = LG.Config.court;
+  assert(C.width === 30 && C.length === 50, 'the cage is 30 x 50 (was 26 x 44)', C.width + ' x ' + C.length);
+  assert(LG.Pitch.hw() === 15 && LG.Pitch.hl() === 25, 'LG.Pitch reads the live court');
+  LG.Difficulty.set('hard');
+  var m = newMatch(); m.start(); m.activatePlayer = function () {};
+  m.home.forEach(function (p) { p.isHuman = false; if (!p.ai) p.ai = p.isGoalkeeper ? new LG.KeeperBrain(p) : new LG.AIBrain(p); });
+  var badP = 0, badB = 0, badT = 0, maxAbsX = 0, maxAbsZ = 0;
+  for (var f = 0; f < 60 * 100; f++) {
+    m.update(1 / 60);
+    m.all.forEach(function (p) {
+      if (Math.abs(p.x) > C.width / 2 + 0.01 || Math.abs(p.z) > C.length / 2 + 0.4) badP++;
+      if (p.ai && p.ai.moveTarget && (Math.abs(p.ai.moveTarget.x) > C.width / 2 || Math.abs(p.ai.moveTarget.z) > C.length / 2 + 0.6)) badT++;
+      maxAbsX = Math.max(maxAbsX, Math.abs(p.x)); maxAbsZ = Math.max(maxAbsZ, Math.abs(p.z));
+    });
+    var b = m.ball;
+    if (Math.abs(b.x) > C.width / 2 || Math.abs(b.z) > C.length / 2 + C.goalDepth || (Math.abs(b.z) > C.length / 2 && Math.abs(b.x) > C.goalWidth / 2)) badB++;
+  }
+  info('100s of HARD CPU play: players reached |x| ' + maxAbsX.toFixed(1) + ', |z| ' + maxAbsZ.toFixed(1));
+  assert(badP === 0, 'players stay inside the cage', badP);
+  assert(badT === 0, 'AI never steers for a spot outside it', badT);
+  assert(badB === 0, 'the ball never leaves the cage or slips behind the line outside the goal', badB);
+  assert(maxAbsX > 9 || maxAbsZ > 20, 'and the play really uses the extra room', maxAbsX.toFixed(1) + ' / ' + maxAbsZ.toFixed(1));
   LG.Difficulty.set('medium');
 })();
 

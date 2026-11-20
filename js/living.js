@@ -29,6 +29,9 @@ LG.Living = (function () {
   // sidewalk ring: every point stays inside the S/N (z<=35) and E/W
   // (x<=30) sidewalk bands, clear of benches, bollards and the crowd
   var WALK = 28;
+  // Build 8: the end stands moved out with the bigger cage, so the walkers'
+  // S/N leg runs behind them (still on the pavement, short of the z=35 kerb)
+  function walkZ() { return Math.max(WALK, ((LG.Config && LG.Config.court ? LG.Config.court.length : 44) / 2) + 6.5); }
   // traffic lane of the road ring (parked cars hug the kerb at z+-36.4 /
   // x+-31.4, so the moving lane takes the outer half)
   var CAR_RX = 34.2, CAR_RZ = 39.5;
@@ -433,12 +436,13 @@ LG.Living = (function () {
     for (var i = 0; i < folk.length; i++) {
       var mv = folk[i], m = mv.folk.m, p = mv.p;
       if (mv.kind === 'ped') {
-        var L = 8 * WALK;
+        var WZ = walkZ();
+        var L = 4 * (WALK + WZ);
         mv.t = (mv.t + mv.dir * mv.walkV * dt / L) % 1;
         if (mv.t < 0) mv.t += 1;
-        var q = ringPos(WALK, WALK, mv.t);
+        var q = ringPos(WALK, WZ, mv.t);
         // round the corners: look a little ahead and steer the facing
-        var q2 = ringPos(WALK, WALK, mv.t + mv.dir * 1.2 / L);
+        var q2 = ringPos(WALK, WZ, mv.t + mv.dir * 1.2 / L);
         var yaw = Math.atan2(q2.x - q.x, q2.z - q.z);
         var dy = yaw - p.facing; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
         p.facing += dy * Math.min(1, dt * 5);
@@ -513,7 +517,7 @@ LG.Living = (function () {
         SKINS[i % SKINS.length], HAIRS[i % HAIRS.length]);
       movers.push({
         kind: 'ped', idx: i, t: (i / PEDS) % 1,
-        speed: 0.025 + Math.random() * 0.015, Rx: WALK, Rz: WALK,
+        speed: 0.025 + Math.random() * 0.015, Rx: WALK, Rz: walkZ(),
         dir: 1, phase: Math.random() * 6.283,
       });
     }

@@ -189,6 +189,8 @@ LG.Audio = (function () {
     ballBounce: function (v) { var d = UI.clamp(v, 0, 1); thump(140, 0.06, 0.06 + d * 0.2); },
     post: function () { thump(260, 0.28, 0.5); blip(420, 0.25, 'square', 0.18, 0, 300); crowdSwell(0.75); },
     wall: function () { noiseHit(0.06, 0.1, 500); },
+    // Build 8: the ball rippling into the net — a soft swish, never a bang
+    net: function (v) { var d = UI.clamp(v != null ? v : 0.5, 0, 1); noiseHit(0.16 + d * 0.12, 0.04 + d * 0.1, 650 + d * 450, 0, 'lowpass'); },
     goal: function (own) {
       blip(523, 0.12, 'square', 0.16); blip(659, 0.12, 'square', 0.16, 0.1);
       blip(784, 0.14, 'square', 0.18, 0.2); blip(1046, 0.4, 'square', 0.2, 0.3);
