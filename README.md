@@ -26,6 +26,11 @@ node tools/shot.js --state menu --out menu.png
 node tools/shot.js --glbtest --glbpose tackle:0.29 --out tackle.png
 ```
 
+## What's new in 1.4.0
+
+- **Kit room:** PLAYER STYLE is now two live 3D players, one from your team and one from the Rogue Squad. Tap a player to change that team's kit colour (the two teams can never match). Tap the orb under a player to change the team's kit style (Hoodie, Hood Down, Track Top, Jersey, Pinnie, Long Sleeve, Windbreaker, Baggy Kit). The whole team wears the style; keepers keep the keeper kit. Both choices are remembered and used by PLAY NOW.
+- **No more GEAR box or colour grids.** Hair, accessories and skin are shuffled every match, and every squad of three has one black, one white and one mixed-skin player.
+
 ## What's new in 1.3.0
 
 - **Real kits:** every outfit is now an actual garment on the body, not paint on a slim mannequin. BAGGY KIT is an oversized tee hanging past the shorts with elbow-length sleeves and knee-length baggy shorts; HOODIE has the hood up, a kangaroo pocket and drawstrings; HOOD DOWN has the hood folded on the back; TRACK TOP has a zip, stand collar and three stripes; JERSEY has a V-neck, chevron, crest, side panels and a sleeve band; LONG SLEEVE is a fitted compression top; WINDBREAKER is two-tone with a zip, reflective strip and stand collar; PINNIE is a see-through mesh bib with numbers over a tee; keepers wear a padded keeper kit. Numbers are printed on the fabric. The cloth moves with every animation.

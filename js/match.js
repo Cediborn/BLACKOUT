@@ -82,7 +82,11 @@ LG.MatchManager.prototype = {
     var awayKit = (O.awayColor && O.awayColor.color != null) ? O.awayColor.color : K.away;
     this.kitColors = [homeKit, awayKit];
 
-    var team0 = this.teamOf(this.applyKit(mateDefs, homeKit), 0);
+    // Build 4: one kit STYLE per side too (PLAYER STYLE orbs); hair,
+    // accessory and skin are dealt fresh per squad by LG.KitRoom
+    var KR = LG.KitRoom;
+    this.kitStyles = KR ? [KR.validStyle(O.homeStyle, 'home'), KR.validStyle(O.awayStyle, 'away')] : [null, null];
+    var team0 = this.teamOf(this.applyKit(mateDefs, homeKit, this.kitStyles[0]), 0);
     // Tournament fixtures pin the opponent side; quick/challenge keep the
     // existing random draw (no hidden difficulty buffs either way).
     var oppIds;
@@ -97,7 +101,7 @@ LG.MatchManager.prototype = {
     }
 
     var awayDefs = oppIds.map(function (id) { return LG.byId(id); });
-    var team1 = this.teamOf(this.applyKit(awayDefs, awayKit), 1);
+    var team1 = this.teamOf(this.applyKit(awayDefs, awayKit, this.kitStyles[1]), 1);
 
     // one dedicated goalkeeper per team (outfield stays 3v3)
     team0.push(this.makeGoalkeeper(0));
@@ -170,7 +174,8 @@ LG.MatchManager.prototype = {
 
   // Uniform kit for one side: shirt + trousers + boots all take the side's
   // colour (skin, hair, trim and gloves stay with the character).
-  applyKit: function (defs, color) {
+  applyKit: function (defs, color, style) {
+    if (style && LG.KitRoom && LG.KitRoom.dress) return LG.KitRoom.dress(defs, color, style);
     if (color == null) return defs;
     return defs.map(function (d) {
       var clone = JSON.parse(JSON.stringify(d));

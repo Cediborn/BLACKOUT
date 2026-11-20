@@ -232,7 +232,7 @@ global.console.error = global.console.error;
 // ---------------- load the real code ----------------
 var SRC = ['js/config.js', 'js/difficulty.js', 'js/util.js', 'js/audio.js', 'js/challenges.js', 'js/progression.js', 'js/modes.js', 'js/tournament.js', 'js/settings.js',
   'js/menu-music.js',
-  'js/input.js', 'js/particles.js', 'js/courts.js', 'js/models.js', 'js/cosmetics.js', 'js/crowd.js', 'js/rig.js', 'js/athlete.js', 'js/ball.js', 'js/player.js', 'js/vehicles.js', 'js/arena.js', 'js/abilities.js',
+  'js/input.js', 'js/particles.js', 'js/courts.js', 'js/models.js', 'js/cosmetics.js', 'js/kitroom.js', 'js/crowd.js', 'js/rig.js', 'js/athlete.js', 'js/ball.js', 'js/player.js', 'js/vehicles.js', 'js/arena.js', 'js/abilities.js',
   'js/ai.js', 'js/keeper.js', 'js/camera.js', 'js/lighting.js', 'js/match.js', 'js/celebration.js', 'js/goal-cinematic.js', 'js/reactions.js', 'js/hud.js', 'js/main.js', 'js/living.js'];
 
 section('1. scripts parse + boot (as a phone)');
@@ -410,43 +410,75 @@ try {
   // STAR -> PLAYER STYLE (no court/style/kick-off buttons live on the star screen anymore)
   elements['btn-select-go'].fire('click');
   check(vis('style-overlay') && !vis('select-overlay'), 'CONTINUE opens PLAYER STYLE');
-  check(elements['color-grid'] && elements['color-grid'].children.length > 0, 'your kit colors build');
-  check(elements['away-color-grid'] && elements['away-color-grid'].children.length > 0, 'the opponent kit colors build');
+  // Build 4: PLAYER STYLE is a kit room — two players, tap = colour, orb = style
+  check(!elements['color-grid'] && !elements['away-color-grid'], 'the old kit colour grids are gone');
+  check(!elements['gear-outfit'] && !elements['gear-hair'] && !elements['gear-accessory'] && !elements['gear-skin'] && !elements['btn-gear-reset'],
+    'the GEAR box is gone (no outfit, hair, accessory or skin rows)');
+  check(!!elements['kit-home-player'] && !!elements['kit-away-player'] && !!elements['kit-home-orb'] && !!elements['kit-away-orb'],
+    'the kit room has two tappable players, each with a style orb');
+  check(!!window.LG.KitRoom, 'the kit room module loads');
   check(!!window.LG.Cosmetics, 'the cosmetics module loads');
   (function () {
     if (!window.LG.Cosmetics) return;
     var cat = LG.Cosmetics.catalog();
     check(cat.outfits.length >= 8 && cat.hairs.length >= 8 && cat.accessories.length >= 6 && cat.skins.length >= 6,
-      'the gear catalog is complete (8 outfits, 8 hairstyles, 6 accessories, 6 skin tones)',
+      'the look catalog is complete (8 outfits, 8 hairstyles, 6 accessories, 6 skin tones)',
       'outfits=' + cat.outfits.length + ' hairs=' + cat.hairs.length +
       ' acc=' + cat.accessories.length + ' skins=' + cat.skins.length);
-    check(elements['gear-outfit'] && elements['gear-outfit'].children.length === cat.outfits.length,
-      'the outfit picker builds one button per design',
-      String(elements['gear-outfit'] ? elements['gear-outfit'].children.length : -1));
-    check(elements['gear-hair'] && elements['gear-hair'].children.length === cat.hairs.length,
-      'the hair picker builds one button per style',
-      String(elements['gear-hair'] ? elements['gear-hair'].children.length : -1));
-    check(elements['gear-accessory'] && elements['gear-accessory'].children.length === cat.accessories.length,
-      'the accessory picker builds one button per option',
-      String(elements['gear-accessory'] ? elements['gear-accessory'].children.length : -1));
-    check(elements['gear-skin'] && elements['gear-skin'].children.length === cat.skins.length,
-      'the skin picker builds one button per tone',
-      String(elements['gear-skin'] ? elements['gear-skin'].children.length : -1));
   })();
+  check(elements['kit-home-style'].textContent.length > 0 && elements['kit-away-style'].textContent.length > 0,
+    'both kit styles are named under the players', elements['kit-home-style'].textContent + ' / ' + elements['kit-away-style'].textContent);
 
-  // kits: grid = [REGULAR/DEFAULT, RED, BLUE, YELLOW, ...]
-  elements['color-grid'].children[1].fire('click');        // YOUR KIT = RED
-  elements['away-color-grid'].children[2].fire('click');   // ROGUE = BLUE
+  var sel0 = window.LGMain.getSelections();
+  elements['kit-home-player'].fire('click');               // tap YOUR player -> next colour
   var sel = window.LGMain.getSelections();
-  check(sel.homeKit === 'red' && sel.awayKit === 'blue', 'both kit picks are remembered', JSON.stringify(sel));
+  check(!!sel.homeKit && sel.homeKit !== sel0.homeKit, 'tapping your player changes your kit colour', JSON.stringify([sel0.homeKit, sel.homeKit]));
+  var clash = false, seenAway = {};
+  for (var kc = 0; kc < 20; kc++) {
+    elements['kit-away-player'].fire('click');
+    sel = window.LGMain.getSelections();
+    seenAway[sel.awayKit] = 1;
+    if (sel.awayKit === sel.homeKit) clash = true;
+  }
+  check(!clash && Object.keys(seenAway).length >= LG.OutfitColors.length - 1,
+    'tapping the Rogue player cycles every colour except yours', JSON.stringify(Object.keys(seenAway)));
+  for (kc = 0; kc < 20; kc++) {
+    elements['kit-home-player'].fire('click');
+    sel = window.LGMain.getSelections();
+    if (sel.awayKit === sel.homeKit) clash = true;
+  }
+  check(!clash, 'the two kits can never match', JSON.stringify(sel));
 
-  elements['away-color-grid'].children[1].fire('click');   // ROGUE = RED -> mirrors yours, refused
+  var st0 = sel.homeStyle;
+  elements['kit-home-orb'].fire('click');
   sel = window.LGMain.getSelections();
-  check(sel.homeKit === 'red' && sel.awayKit === 'blue', 'a Rogue kit identical to yours is refused', JSON.stringify(sel));
+  check(!!sel.homeStyle && sel.homeStyle !== st0, 'tapping your orb changes your kit style', JSON.stringify([st0, sel.homeStyle]));
+  var seenStyle = {};
+  for (kc = 0; kc < LG.Cosmetics.catalog().outfits.length; kc++) {
+    elements['kit-away-orb'].fire('click');
+    seenStyle[window.LGMain.getSelections().awayStyle] = 1;
+  }
+  check(Object.keys(seenStyle).length === LG.Cosmetics.catalog().outfits.length, 'the Rogue orb cycles every kit style', JSON.stringify(Object.keys(seenStyle)));
+  check(elements['kit-home-style'].textContent === LG.KitRoom.styleLabel(window.LGMain.getSelections().homeStyle),
+    'the style name under your player follows the orb');
 
-  elements['color-grid'].children[2].fire('click');        // YOUR KIT = BLUE -> rogue must move
-  sel = window.LGMain.getSelections();
-  check(sel.homeKit === 'blue' && sel.awayKit && sel.awayKit !== 'blue', 'the two kits can never match', JSON.stringify(sel));
+  // looks: every squad of three has a black, a white and a mixed-skin player
+  (function () {
+    var ok = true, bad = '';
+    for (var n = 0; n < 60; n++) {
+      var L = LG.KitRoom.looks(3), tones = L.map(function (l) { return l.skin; });
+      var d = tones.filter(function (t) { return LG.KitRoom.tones.dark.indexOf(t) >= 0; }).length;
+      var w = tones.filter(function (t) { return LG.KitRoom.tones.light.indexOf(t) >= 0; }).length;
+      var m = tones.filter(function (t) { return LG.KitRoom.tones.mid.indexOf(t) >= 0; }).length;
+      if (d !== 1 || w !== 1 || m !== 1) { ok = false; bad = JSON.stringify(tones); }
+    }
+    check(ok, 'every dealt squad has one black, one white and one mixed-skin player', bad);
+    var before = JSON.stringify(LG.Roster[0]);
+    var dressed = LG.KitRoom.dress([LG.Roster[0], LG.Roster[1], LG.Roster[2]], 0xff4444, 'baggy');
+    check(dressed.every(function (d) { return d.__cos && d.__cos.outfit === 'baggy' && d.palette.shirt === 0xff4444; }),
+      'a dressed squad all wear the team kit style and colour');
+    check(dressed[0] !== LG.Roster[0] && JSON.stringify(LG.Roster[0]) === before, 'dressing never mutates the roster');
+  })();
 
   (function () {
     if (!window.LG.Cosmetics) return;

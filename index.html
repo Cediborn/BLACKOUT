@@ -143,7 +143,7 @@
           <button id="btn-how" class="big-btn gold menu-card" type="button">HOW TO PLAY</button>
           <button id="btn-about" class="big-btn gold menu-card" type="button">ABOUT</button>
         </div>
-        <div class="menu-version" id="menu-version">v1.3.0</div>
+        <div class="menu-version" id="menu-version">v1.4.0</div>
       </div>
     </div>
   </div>
@@ -274,41 +274,40 @@
   <div id="style-overlay" class="overlay hidden">
     <div class="panel">
       <div class="title-xl" style="font-size:clamp(24px,6vmin,44px)"><span class="t1">PLAYER</span> <span class="t2">STYLE</span></div>
-      <div class="kit-columns">
-        <div class="kit-block">
-          <div class="kit-title">YOUR KIT</div>
-          <div id="color-grid" class="color-grid"></div>
-          <div id="style-preview" class="style-preview"></div>
+      <div class="kit-hint">TAP A PLAYER TO CHANGE KIT COLOUR · TAP THE ORB TO CHANGE KIT STYLE</div>
+      <div class="kit-room">
+        <div class="kit-side" data-side="home">
+          <div class="kit-side-head"><span class="kit-team">YOUR TEAM</span><span id="kit-home-colour" class="kit-colour-name"></span></div>
+          <button id="kit-home-player" class="kit-stage" type="button" aria-label="Your team kit colour, tap to change">
+            <span id="kit-home-floor" class="kit-floor"></span>
+            <canvas id="kit-home-canvas" class="kit-canvas"></canvas>
+            <span id="kit-home-badge" class="kit-badge"></span>
+          </button>
+          <div id="kit-home-dots" class="kit-dots" aria-hidden="true"></div>
+          <div class="kit-style-row">
+            <button id="kit-home-orb" class="kit-orb" type="button" aria-label="Your team kit style, tap to change">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#141413" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 6l2 4 2-1v12h8V9l2 1 2-4-4-3c0 1.7-1.8 3-4 3S8 4.7 8 3Z"/></svg>
+            </button>
+            <div class="kit-style-text"><span class="kit-style-cap">KIT STYLE</span><span id="kit-home-style" class="kit-style-name"></span></div>
+          </div>
         </div>
-        <div class="kit-block">
-          <div class="kit-title">ROGUE SQUAD KIT</div>
-          <div id="away-color-grid" class="color-grid"></div>
-          <div id="away-kit-note" class="kit-note"></div>
-        </div>
-      </div>
-      <div class="kit-block gear-block">
-        <div class="kit-title">GEAR</div>
-        <div class="gear-row">
-          <div class="gear-label">OUTFIT</div>
-          <div id="gear-outfit" class="gear-grid"></div>
-        </div>
-        <div class="gear-row">
-          <div class="gear-label">HAIR</div>
-          <div id="gear-hair" class="gear-grid"></div>
-        </div>
-        <div class="gear-row">
-          <div class="gear-label">ACCESSORY</div>
-          <div id="gear-accessory" class="gear-grid"></div>
-        </div>
-        <div class="gear-row">
-          <div class="gear-label">SKIN</div>
-          <div id="gear-skin" class="gear-grid"></div>
-        </div>
-        <div class="gear-foot">
-          <div id="gear-note" class="kit-note"></div>
-          <button id="btn-gear-reset" class="big-btn secondary small-btn">RESET GEAR</button>
+        <div class="kit-side" data-side="away">
+          <div class="kit-side-head"><span class="kit-team">ROGUE SQUAD</span><span id="kit-away-colour" class="kit-colour-name"></span></div>
+          <button id="kit-away-player" class="kit-stage" type="button" aria-label="Rogue squad kit colour, tap to change">
+            <span id="kit-away-floor" class="kit-floor"></span>
+            <canvas id="kit-away-canvas" class="kit-canvas"></canvas>
+            <span id="kit-away-badge" class="kit-badge"></span>
+          </button>
+          <div id="kit-away-dots" class="kit-dots" aria-hidden="true"></div>
+          <div class="kit-style-row">
+            <button id="kit-away-orb" class="kit-orb" type="button" aria-label="Rogue squad kit style, tap to change">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#141413" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 6l2 4 2-1v12h8V9l2 1 2-4-4-3c0 1.7-1.8 3-4 3S8 4.7 8 3Z"/></svg>
+            </button>
+            <div class="kit-style-text"><span class="kit-style-cap">KIT STYLE</span><span id="kit-away-style" class="kit-style-name"></span></div>
+          </div>
         </div>
       </div>
+      <div class="kit-note kit-looks-note">HAIR, ACCESSORIES AND SKIN ARE SHUFFLED EVERY MATCH · EVERY SQUAD HAS A BLACK, A WHITE AND A MIXED-SKIN PLAYER</div>
       <div class="row-btns nav-btns">
         <button id="btn-style-back" class="big-btn secondary">BACK</button>
         <button id="btn-style-go" class="big-btn gold">CONTINUE</button>
@@ -496,7 +495,7 @@
         <div class="help-section" data-about="about">
           <div class="help-section-title">ABOUT</div>
           <div class="help-row"><span class="help-key">GAME</span><span class="help-desc">BLACKOUT is a 3V3 street football game with goalkeepers — quick matches, focused challenges and a four-team Street Cup.</span></div>
-          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.3.0</b></span></div>
+          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.4.0</b></span></div>
           <div class="help-row"><span class="help-key">RUN</span><span class="help-desc">Plays fully offline after the first load. No account, no server, no purchases.</span></div>
         </div>
         <div class="help-section" data-about="credits">
@@ -611,7 +610,7 @@
     if (window.THREE && THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 
     // Single early version stamp so a failed boot still shows a real number.
-    window.BLOCKOUT_VERSION = '1.3.0';
+    window.BLOCKOUT_VERSION = '1.4.0';
     window.addEventListener('error', function (e) {
       try {
         var box = document.getElementById('loading-error');
@@ -653,6 +652,7 @@
   <script src="js/rig.js"></script>
 <script src="js/realplayer.js"></script>
   <script src="js/garments.js"></script>
+  <script src="js/kitroom.js"></script>
   <script src="js/athlete.js"></script>
   <script src="js/ball.js"></script>
   <script src="js/player.js"></script>

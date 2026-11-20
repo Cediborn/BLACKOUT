@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v20';   // Build 3 — real garments, real fans, street people, street life
+var CACHE_NAME = 'blackout-v21';   // Build 4 — kit room (PLAYER STYLE with live 3D players)
 var ASSETS = [
   './',
   './index.html',
@@ -53,6 +53,7 @@ var ASSETS = [
   './js/cosmetics.js',
   './js/fanbody.js',
   './js/garments.js',
+  './js/kitroom.js',
   './js/rig.js',
   './js/realplayer.js',
   './js/athlete.js',

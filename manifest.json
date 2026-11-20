@@ -2,7 +2,7 @@
   "name": "BLACKOUT — Street Football",
   "short_name": "BLACKOUT",
   "description": "3V3 street football game with goalkeepers",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

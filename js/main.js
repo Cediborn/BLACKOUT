@@ -19,6 +19,8 @@
   var selectedId = 'blaze';
   var outfitColor = null;        // null = regular clothes, or LG.OutfitColors entry
   var awayColor = null;          // null = default rogue kit, or LG.OutfitColors entry
+  var homeStyle = null;          // Build 4: team kit style (LG.Cosmetics outfit id)
+  var awayStyle = null;
   var bgT = 0;
   var clock = { t: 0 };
   var isMobile = false;
@@ -41,6 +43,7 @@
         star: selectedId,
         kit: outfitColor ? outfitColor.id : null,
         away: awayColor ? awayColor.id : null,
+        homeStyle: homeStyle, awayStyle: awayStyle,
       }));
     } catch (e) { /* storage blocked: PLAY NOW just uses defaults */ }
     refreshQuickPlayLabel();
@@ -55,6 +58,8 @@
       outfitColor = colorById(d.kit);
       awayColor = colorById(d.away);
       if (outfitColor && awayColor && outfitColor.id === awayColor.id) awayColor = null;
+      if (typeof d.homeStyle === 'string') homeStyle = d.homeStyle;
+      if (typeof d.awayStyle === 'string') awayStyle = d.awayStyle;
     }
     refreshQuickPlayLabel();
   }
@@ -64,7 +69,8 @@
     var def = LG.byId(selectedId);
     var court = (LG.Courts && LG.Courts.get && LG.Courts.selected) ? LG.Courts.get(LG.Courts.selected()) : null;
     var parts = [def ? def.name : ''];
-    parts.push(outfitColor ? outfitColor.label + ' KIT' : 'REGULAR KIT');
+    var styleName = (LG.KitRoom && homeStyle) ? ' ' + LG.KitRoom.styleLabel(homeStyle) : ' KIT';
+    parts.push((outfitColor ? outfitColor.label : 'BLUE') + styleName);
     if (court && court.name) parts.push(court.name);
     el.textContent = parts.join(' · ');
   }
@@ -665,15 +671,14 @@
     // STAR -> PLAYER STYLE (kit colors for both sides)
     bus.on('selectConfirmed', function () {
       UIState = 'style';
-      buildColorGrid();
-      buildAwayColorGrid();
-      buildGearGrid();
       showOverlay('select-overlay', false);
       showOverlay('style-overlay', true);
+      buildKitRoom();
     });
 
     bus.on('styleBackRequested', function () {
       UIState = 'select';
+      if (LG.KitRoom) LG.KitRoom.stop();
       showOverlay('style-overlay', false);
       showOverlay('select-overlay', true);
     });
@@ -681,6 +686,7 @@
     // PLAYER STYLE -> COURT SELECTION
     bus.on('styleConfirmed', function () {
       UIState = 'court';
+      if (LG.KitRoom) LG.KitRoom.stop();
       buildCourtGrid();
       showOverlay('style-overlay', false);
       showOverlay('court-overlay', true);
@@ -690,6 +696,7 @@
       UIState = 'style';
       showOverlay('court-overlay', false);
       showOverlay('style-overlay', true);
+      if (LG.KitRoom) { refreshKitRoom(); LG.KitRoom.start(); }
     });
 
     // COURT SELECTION -> MATCH SETUP (day/night + portrait/landscape)
@@ -1571,6 +1578,8 @@
       difficulty: LG.Difficulty.get(),
       outfitColor: outfitColor,
       awayColor: awayColor,
+      homeStyle: homeStyle,
+      awayStyle: awayStyle,
     };
 
     // Tournament fixture: pin the opponent side + open the once-only latch.
@@ -1787,53 +1796,103 @@
     }
   }
 
-  function buildColorGrid() {
-    var grid = document.getElementById('color-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    // regular clothes button
-    var regBtn = document.createElement('div');
-    regBtn.className = 'color-btn' + (outfitColor === null ? ' selected' : '');
-    regBtn.innerHTML = '<div class="color-swatch" style="background:linear-gradient(135deg,#3d6b50,#6b3d66);border-color:rgba(255,255,255,0.5)"></div><div class="color-label">REGULAR</div>';
-    regBtn.addEventListener('click', function() {
-      outfitColor = null;
-      refreshColorGrid();
-      refreshAwayColorGrid();
-      LG.Audio.sfx.click();
-    });
-    grid.appendChild(regBtn);
-    // color buttons
-    for (var i = 0; i < LG.OutfitColors.length; i++) {
-      (function(c) {
-        var btn = document.createElement('div');
-        btn.className = 'color-btn' + (outfitColor && outfitColor.id === c.id ? ' selected' : '');
-        btn.innerHTML = '<div class="color-swatch" style="background:' + c.hex + '"></div><div class="color-label">' + c.label + '</div>';
-        btn.addEventListener('click', function() {
-          outfitColor = c;
-          resolveKitClash();
-          refreshColorGrid();
-          refreshAwayColorGrid();
+  // ---------------- kit room (Build 4) ----------------
+  // Two live players: YOUR TEAM and the ROGUE SQUAD. Tap a player for the
+  // next kit colour (never the other team's), tap the orb under them for the
+  // next kit style. Looks (hair, accessory, skin) are dealt by LG.KitRoom.
+  var kitLooks = null;
+  function kitColour(side) {
+    var c = side === 'home' ? outfitColor : awayColor;
+    if (c) return c;
+    var want = side === 'home' ? (LG.Config.kits && LG.Config.kits.home) : (LG.Config.kits && LG.Config.kits.away);
+    for (var i = 0; i < LG.OutfitColors.length; i++) if (LG.OutfitColors[i].color === want) return LG.OutfitColors[i];
+    return LG.OutfitColors[side === 'home' ? 1 : 0];
+  }
+  function nextKitColour(side) {
+    var cur = kitColour(side), other = kitColour(side === 'home' ? 'away' : 'home');
+    var L = LG.OutfitColors, i;
+    for (i = 0; i < L.length; i++) if (L[i].id === cur.id) break;
+    var n = L[(i + 1) % L.length];
+    if (n.id === other.id) n = L[(i + 2) % L.length];
+    if (side === 'home') outfitColor = n; else awayColor = n;
+  }
+  function rogueDef() {
+    var mine = LG.byId(selectedId);
+    var team = (mine && mine.team) || [];
+    var pool = ['stone', 'echo', 'volt', 'cannon', 'brute', 'blaze'];
+    for (var i = 0; i < pool.length; i++) {
+      if (pool[i] !== selectedId && team.indexOf(pool[i]) < 0 && LG.byId(pool[i])) return LG.byId(pool[i]);
+    }
+    return LG.byId('stone') || mine;
+  }
+  function buildKitRoom() {
+    if (!LG.KitRoom) return;
+    kitLooks = { home: LG.KitRoom.looks(1)[0], away: LG.KitRoom.looks(1)[0] };
+    LG.KitRoom.mount('home', document.getElementById('kit-home-canvas'));
+    LG.KitRoom.mount('away', document.getElementById('kit-away-canvas'));
+    ['home', 'away'].forEach(function (side) {
+      var player = document.getElementById('kit-' + side + '-player');
+      var orb = document.getElementById('kit-' + side + '-orb');
+      if (player && !player._kitBound) {
+        player._kitBound = 1;
+        player.addEventListener('click', function () {
+          nextKitColour(side);
+          refreshKitRoom();
           LG.Audio.sfx.click();
         });
-        grid.appendChild(btn);
-      })(LG.OutfitColors[i]);
-    }
-    refreshStylePreview();
-  }
-
-  function refreshColorGrid() {
-    var btns = document.querySelectorAll('#color-grid .color-btn');
-    for (var i = 0; i < btns.length; i++) {
-      if (i === 0) {
-        btns[i].classList.toggle('selected', outfitColor === null);
-      } else {
-        var c = LG.OutfitColors[i - 1];
-        btns[i].classList.toggle('selected', outfitColor && outfitColor.id === c.id);
       }
-    }
-    refreshStylePreview();
+      if (orb && !orb._kitBound) {
+        orb._kitBound = 1;
+        orb.addEventListener('click', function () {
+          if (side === 'home') homeStyle = LG.KitRoom.nextStyle(homeStyle);
+          else awayStyle = LG.KitRoom.nextStyle(awayStyle);
+          refreshKitRoom();
+          LG.Audio.sfx.click();
+        });
+      }
+    });
+    refreshKitRoom();
+    LG.KitRoom.start();
   }
-
+  function refreshKitRoom() {
+    if (!LG.KitRoom) return;
+    homeStyle = LG.KitRoom.validStyle(homeStyle, 'home');
+    awayStyle = LG.KitRoom.validStyle(awayStyle, 'away');
+    ['home', 'away'].forEach(function (side) {
+      var c = kitColour(side), other = kitColour(side === 'home' ? 'away' : 'home');
+      var style = side === 'home' ? homeStyle : awayStyle;
+      var team = side === 'home' ? 'YOUR TEAM' : 'ROGUE SQUAD';
+      var el = function (id) { return document.getElementById('kit-' + side + '-' + id); };
+      if (el('colour')) el('colour').textContent = c.label;
+      if (el('style')) el('style').textContent = LG.KitRoom.styleLabel(style);
+      if (el('floor')) el('floor').style.background = c.hex;
+      var orbEl = el('orb'), playerEl = el('player');
+      if (orbEl && orbEl.style && orbEl.style.setProperty) orbEl.style.setProperty('--kit', c.hex);
+      if (orbEl && orbEl.setAttribute) orbEl.setAttribute('aria-label', team + ' kit style ' + LG.KitRoom.styleLabel(style) + ', tap to change');
+      if (playerEl && playerEl.setAttribute) playerEl.setAttribute('aria-label', team + ' kit colour ' + c.label + ', tap to change');
+      if (el('dots')) {
+        var html = '';
+        for (var i = 0; i < LG.OutfitColors.length; i++) {
+          var d = LG.OutfitColors[i];
+          html += '<span class="kit-dot' + (d.id === c.id ? ' on' : '') + (d.id === other.id ? ' taken' : '') +
+            '" style="background:' + d.hex + '"></span>';
+        }
+        el('dots').innerHTML = html;
+      }
+      var base = side === 'home' ? LG.byId(selectedId) : rogueDef();
+      var def = JSON.parse(JSON.stringify(base || {}));
+      def.palette = def.palette || {};
+      def.palette.shirt = c.color; def.palette.pants = c.color;
+      var live = base && kitLooks ? LG.KitRoom.show(side, def, style, kitLooks[side]) : false;
+      var badge = el('badge');
+      if (badge) {
+        badge.style.display = live ? 'none' : 'flex';
+        badge.style.background = c.hex;
+        badge.textContent = LG.KitRoom.styleLabel(style);
+      }
+    });
+    saveLastSetup();
+  }
   // ---------------- court picker UI ----------------
   function buildCourtGrid() {
     var grid = document.getElementById('court-grid');
@@ -1892,154 +1951,6 @@
       var id = i === 0 ? '' : (list[i - 1] ? list[i - 1].id : '');
       btns[i].classList.toggle('selected', id === selected);
     }
-  }
-
-  // ---------------- opponent kit UI ----------------
-  function buildAwayColorGrid() {
-    var grid = document.getElementById('away-color-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    var regBtn = document.createElement('div');
-    regBtn.className = 'color-btn' + (awayColor === null ? ' selected' : '');
-    regBtn.innerHTML = '<div class="color-swatch" style="background:linear-gradient(135deg,#7a1f1f,#241010);border-color:rgba(255,255,255,0.5)"></div><div class="color-label">DEFAULT</div>';
-    regBtn.addEventListener('click', function () {
-      awayColor = null;
-      refreshAwayColorGrid();
-      LG.Audio.sfx.click();
-    });
-    grid.appendChild(regBtn);
-    for (var i = 0; i < LG.OutfitColors.length; i++) {
-      (function (c) {
-        var btn = document.createElement('div');
-        btn.className = 'color-btn' + (awayColor && awayColor.id === c.id ? ' selected' : '');
-        btn.innerHTML = '<div class="color-swatch" style="background:' + c.hex + '"></div><div class="color-label">' + c.label + '</div>';
-        btn.addEventListener('click', function () {
-          // refuse a Rogue kit that would mirror yours — the squads stay apart
-          if (outfitColor && outfitColor.id === c.id) {
-            refreshAwayColorGrid();
-            var note = document.getElementById('away-kit-note');
-            if (note) {
-              note.className = 'kit-note conflict';
-              note.textContent = c.label + ' IS YOUR KIT — PICK A DIFFERENT COLOR';
-            }
-            LG.Audio.sfx.click();
-            return;
-          }
-          awayColor = c;
-          refreshAwayColorGrid();
-          LG.Audio.sfx.click();
-        });
-        grid.appendChild(btn);
-      })(LG.OutfitColors[i]);
-    }
-    refreshAwayColorGrid();
-  }
-
-  function refreshAwayColorGrid() {
-    var btns = document.querySelectorAll('#away-color-grid .color-btn');
-    for (var i = 0; i < btns.length; i++) {
-      if (i === 0) {
-        btns[i].classList.toggle('selected', awayColor === null);
-      } else {
-        var c = LG.OutfitColors[i - 1];
-        btns[i].classList.toggle('selected', awayColor && awayColor.id === c.id);
-      }
-    }
-    refreshAwayKitNote();
-  }
-
-  function refreshAwayKitNote() {
-    var note = document.getElementById('away-kit-note');
-    if (!note) return;
-    if (!awayColor || !outfitColor || awayColor.id !== outfitColor.id) {
-      note.className = 'kit-note';
-      note.textContent = awayColor
-        ? 'ROGUE SQUAD wear the ' + awayColor.label + ' kit'
-        : 'ROGUE SQUAD keep their default kits';
-      return;
-    }
-    note.className = 'kit-note conflict';
-    note.textContent = awayColor.label + ' IS YOUR KIT — PICK A DIFFERENT COLOR';
-  }
-
-  function refreshStylePreview() {
-    var preview = document.getElementById('style-preview');
-    if (!preview) return;
-    var playerDef = LG.byId(selectedId);
-    var name = playerDef ? playerDef.name : '';
-    if (outfitColor === null) {
-      preview.innerHTML = '<div class="preview-label">' + name + ' — REGULAR KIT</div>';
-    } else {
-      preview.innerHTML = '<div class="preview-label">' + name + ' — ' + outfitColor.label + ' KIT</div>';
-    }
-    if (LG.Cosmetics) {
-      var cat = LG.Cosmetics.catalog();
-      var g = LG.Cosmetics.get(selectedId);
-      preview.innerHTML += '<div class="gear-line">' +
-        LG.Cosmetics.labelOf(cat.outfits, g.outfit) + ' · ' +
-        LG.Cosmetics.labelOf(cat.hairs, g.hair) + ' · ' +
-        LG.Cosmetics.labelOf(cat.accessories, g.accessory) + '</div>';
-    }
-  }
-
-  function buildGearGrid() {
-    if (!LG.Cosmetics) return;
-    var cat = LG.Cosmetics.catalog();
-    function fill(gridId, list, current, apply) {
-      var grid = document.getElementById(gridId);
-      if (!grid) return;
-      grid.innerHTML = '';
-      for (var i = 0; i < list.length; i++) {
-        (function (entry) {
-          var btn = document.createElement('div');
-          btn.className = 'gear-btn' + (entry.id === current ? ' selected' : '');
-          btn.textContent = entry.label;
-          if (entry.color != null) {
-            btn.className += ' tone';
-            btn.style.background = '#' + (entry.color >>> 0).toString(16).padStart(6, '0');
-          }
-          btn.addEventListener('click', function () {
-            apply(entry.id);
-            buildGearGrid();
-            LG.Audio.sfx.click();
-          });
-          grid.appendChild(btn);
-        })(list[i]);
-      }
-    }
-    var c = LG.Cosmetics.get(selectedId);
-    fill('gear-outfit', cat.outfits, c.outfit, function (id) {
-      LG.Cosmetics.set(selectedId, { outfit: id });
-      refreshStylePreview();
-    });
-    fill('gear-hair', cat.hairs, c.hair, function (id) {
-      LG.Cosmetics.set(selectedId, { hair: id });
-      refreshStylePreview();
-    });
-    fill('gear-accessory', cat.accessories, c.accessory, function (id) {
-      LG.Cosmetics.set(selectedId, { accessory: id });
-      refreshStylePreview();
-    });
-    fill('gear-skin', cat.skins, c.skin, function (id) {
-      LG.Cosmetics.set(selectedId, { skin: id });
-      refreshStylePreview();
-    });
-    var resetBtn = document.getElementById('btn-gear-reset');
-    if (resetBtn && !resetBtn._gearBound) {
-      resetBtn._gearBound = 1;
-      resetBtn.addEventListener('click', function () {
-        LG.Cosmetics.reset(selectedId);
-        buildGearGrid();
-        refreshStylePreview();
-        var note = document.getElementById('gear-note');
-        if (note) {
-          note.className = 'kit-note';
-          note.textContent = 'GEAR RESET TO DEFAULT';
-        }
-        LG.Audio.sfx.click();
-      });
-    }
-    refreshStylePreview();
   }
 
   // Apply outfit colors to a player definition (returns a new palette)
@@ -2187,6 +2098,7 @@
         player: selectedId,
         homeKit: outfitColor ? outfitColor.id : null,
         awayKit: awayColor ? awayColor.id : null,
+        homeStyle: homeStyle, awayStyle: awayStyle,
         difficulty: LG.Difficulty.get(),
         court: LG.Courts ? LG.Courts.selected() : '',
         timeOfDay: LG.Settings.timeOfDay(),

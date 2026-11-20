@@ -4,7 +4,7 @@
 var LG = window.LG = window.LG || {};
 
 LG.Config = {
-  version: '1.3.0',
+  version: '1.4.0',
 
   court: {
     width: 26,        // x extent (half = 13)
