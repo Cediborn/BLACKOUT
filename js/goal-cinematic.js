@@ -101,6 +101,9 @@ LG.GoalCinematic = (function () {
       cam.shakeT = ours.shakeT;
       cam.shakeAmp = ours.shakeAmp;
       cam.zoomPulse = ours.zoomPulse;
+      // Build 7: the hand-back pose has no swing / ball-keeper offset, so the
+      // camera resumes from exactly that pose and eases into them
+      cam.swingZ = 0; cam.keep = 0;
     }
     active = false;
     scorer = null; cam = null; ours = null; fSim = null;
@@ -184,9 +187,10 @@ LG.GoalCinematic = (function () {
 
       // follow simulation — js/camera.js:77-107, so handback lands exactly
       // where the broadcast camera would have been
-      var tx = LG.Util.lerp(targetX, ballX, 0.42);
-      var tz = LG.Util.lerp(targetZ, ballZ, 0.42);
-      var k = Math.min(1, dt * 6.5);
+      // Build 7: the active camera preset's own follow weight and damping
+      var tx = LG.Util.lerp(targetX, ballX, C.ballW != null ? C.ballW : 0.42);
+      var tz = LG.Util.lerp(targetZ, ballZ, C.ballW != null ? C.ballW : 0.42);
+      var k = Math.min(1, dt * (C.damp || 6.5));
       fSim.x = LG.Util.lerp(fSim.x, tx, k);
       fSim.z = LG.Util.lerp(fSim.z, tz, k);
       fSim.x = LG.Util.clamp(fSim.x, -C.xClamp, C.xClamp);
@@ -226,7 +230,8 @@ LG.GoalCinematic = (function () {
       var gpx = land ? fSim.x + C.distance : fSim.x;
       var gpy = C.height;
       var gpz = land ? fSim.z : fSim.z + C.distance;
-      var glx = fSim.x, gly = 1.0, glz = land ? fSim.z : fSim.z - 2.5;
+      if (cam.venueClamp) { var vcl = cam.venueClamp(gpx, gpz, land, C); gpx = vcl.x; gpz = vcl.z; }
+      var glx = fSim.x, gly = C.lookY != null ? C.lookY : 1.0, glz = land ? fSim.z : fSim.z - 2.5;
       var gfov = C.fov - ours.zoomPulse * 7;
 
       var px = gpx, py = gpy, pz = gpz;

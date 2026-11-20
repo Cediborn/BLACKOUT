@@ -216,6 +216,7 @@ LG.HUD = (function () {
     show('btn-shoot', attack);
     show('btn-tackle', !attack);
     show('btn-switch', !attack);
+    show('btn-skill', attack);
   }
 
   var lastCoins = null;

@@ -90,7 +90,7 @@ LG.Weather = (function () {
       if (box.max.y > 0.25 || size.y > 0.3 || size.x < 2.5 || size.z < 2.5) return;
       for (var k = 0; k < mats.length; k++) {
         var mt = mats[k];
-        if (!mt || !mt.color || mt.isMeshBasicMaterial || mt.userData._lgDry || mt.transparent) continue;
+        if (!mt || !mt.color || mt.isMeshBasicMaterial || mt.userData._lgDry || mt.userData.noWet || mt.transparent) continue;
         mt.userData._lgDry = { r: mt.roughness, m: mt.metalness, c: mt.color.clone() };
         if (mt.isMeshStandardMaterial) { mt.roughness = Math.min(mt.roughness, 0.3); mt.metalness = Math.max(mt.metalness, 0.08); }
         mt.color.multiplyScalar(0.72);

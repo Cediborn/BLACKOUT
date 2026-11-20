@@ -13,6 +13,7 @@ LG.Player = function (def, team, idx) {
   this.stats = def.stats;
 
   this.maxSpeed = (4.2 + this.stats.speed * 0.32) *
+    ((LG.Config.player && LG.Config.player.pace) || 1) *            // Build 7: base pace
     ((LG.Config.player && LG.Config.player.speedScale) || 1);   // Phase 11: TURBO twist
   this.accel = LG.Config.physics.playerAccel || 46;   // smooth, not twitchy
   this.sprintMul = LG.Config.physics.sprintMul || 1.55;
@@ -113,6 +114,7 @@ LG.Player.prototype.speedMul = function () {
   if (this.active && this.active.type === 'WALL') m = 0;
   if (LG.Match && LG.Match.slowOwner && LG.Match.slowOwner.team !== this.team && LG.Match.slowOwner.t > 0) m *= 0.55;
   if (this.hasBall) m *= 0.86;
+  if (this._bitT > 0) m *= 0.45;          // bit on a feint: weight on the wrong foot
   if (this.stun > 0) m = 0;
   return m;
 };
@@ -125,6 +127,10 @@ LG.Player.prototype.update = function (dt) {
   this.stomp = Math.max(0, this.stomp - dt);
   this.kickAnim = Math.max(0, this.kickAnim - dt * 5);
   this.tackleAnim = Math.max(0, this.tackleAnim - dt * 2.2);
+  // Build 7 skills: cooldown, a bitten defender's lost step, the move's motion
+  if (this._skillCd > 0) this._skillCd = Math.max(0, this._skillCd - dt);
+  if (this._bitT > 0) this._bitT = Math.max(0, this._bitT - dt);
+  if (this._skill && LG.Skills) LG.Skills.drive(this, dt);
 
   // sprint / stamina
   var P = LG.Config.physics;
@@ -217,6 +223,7 @@ LG.Player.prototype.update = function (dt) {
   }
 
   if (!this.hasBall) this.faceBallLoose(dt);
+  if (this._skill && LG.Skills) LG.Skills.pose(this, dt);
 
   this.phase += dt * (2.2 + sp * 0.55);
   var speedFrac = Math.min(1, Math.sqrt(sp) / this.maxSpeed);
@@ -225,8 +232,13 @@ LG.Player.prototype.update = function (dt) {
   // KICKOFF/GOAL/END) and only reads gameplay as signals; if the mixer
   // ever fails we drop to the classic limb maths, which also works on
   // the rig because limbs/body are bones
-  if (this.model.anim) {
-    if (this.model.anim.update(dt, this) === false) {
+  // Build 7: when a slow frame is split into gameplay sub-steps, the rig
+  // only needs to be posed once — the earlier sub-steps bank their time
+  var animDt = dt;
+  if (LG.Match && LG.Match._skipAnim) { this._animBank = (this._animBank || 0) + dt; animDt = -1; }
+  else if (this._animBank) { animDt = dt + this._animBank; this._animBank = 0; }
+  if (this.model.anim && animDt >= 0) {
+    if (this.model.anim.update(animDt, this) === false) {
       var why = 'repeated mixer errors';
       try { why = this.model.anim.state().lastError || why; } catch (e) { }
       if (window.console && console.warn) {
@@ -235,7 +247,7 @@ LG.Player.prototype.update = function (dt) {
       this.model.anim = null;
     }
   }
-  if (!this.model.anim) {
+  if (!this.model.anim && animDt >= 0) {
     LG.Models.animateChar(this.model, speedFrac > 0.08, this.phase, speedFrac, this.kickAnim);
   }
 

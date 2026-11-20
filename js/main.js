@@ -128,6 +128,7 @@
     // Day/Night atmosphere lives in LG.Lighting (owns the key lights). The
     // arena environment is untouched by it — only its lighting is rebalanced.
     LG.Lighting.build(scene, renderer);
+    if (LG.Post) LG.Post.init(renderer, scene, camera);   // Build 7 graphics pipeline
     applyQuality();        // Phase 10: resolution cap + shadows from the saved level
     var tArena = performance.now();
     arenaObj = LG.Arena.build(scene);
@@ -351,12 +352,21 @@
   }
   function maxDpr() {
     var c = Number(qualityProfile().dprCap);
-    return isFinite(c) && c > 0 ? c : 2;
+    c = isFinite(c) && c > 0 ? c : 2;
+    // Build 7: dynamic resolution — a struggling phone renders fewer pixels
+    // instead of dropping frames (LG.Perf watches the frame time)
+    var k = LG.Perf ? LG.Perf.scale() : 1;
+    return Math.max(0.75, Math.round(c * k * 20) / 20);
   }
   function applyQuality() {
     var q = qualityProfile();
     if (LG.Lighting && LG.Lighting.setShadows) LG.Lighting.setShadows(q.shadows, q.shadowMap);
     document.body.dataset.quality = LG.Settings.qualityLevel(IS_MOBILE);
+    // Build 7: the postprocessing tier follows the quality level (?post=0 off)
+    if (LG.Post) {
+      var pq = null; try { pq = new URLSearchParams(location.search).get('post'); } catch (e) { /* old browser */ }
+      LG.Post.setTier(pq !== null && pq !== '' ? +pq : (q.post || 0));
+    }
     scheduleViewportLayout();
   }
   function setQuality(q) {
@@ -381,7 +391,7 @@
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     }
-    if (sizeMoved || dprMoved) renderer.setSize(w, h);
+    if (sizeMoved || dprMoved) { renderer.setSize(w, h); if (LG.Post) LG.Post.resize(); }
     updateLayoutClass();
     updateRotate();
     if (LG.DBG) LG.DBG.log('[viewport] ' + w + 'x' + h + ' @' + dpr);
@@ -904,6 +914,37 @@
     });
   }
 
+  // ---------------- Build 7: camera presets ----------------
+  var shownCam = 0, lastPerfScale = 1;
+  function refreshCamButton() {
+    var n = LG.Settings.camera ? LG.Settings.camera() : 3;
+    var el = document.getElementById('cam-num'); if (el) el.textContent = n;
+    shownCam = n;
+    for (var i = 1; i <= 5; i++) { var b = document.getElementById('settings-cam-' + i); if (b) b.classList.toggle('selected', i === n); }
+  }
+  function setCamera(n, announce) {
+    LG.Settings.setCamera(n);
+    refreshCamButton();
+    if (announce && LG.HUD && LG.CameraPresets[n]) LG.HUD.toast('CAMERA ' + n + ' · ' + LG.CameraPresets[n].name, 1100);
+  }
+  function bindCameraUI() {
+    var b = document.getElementById('cam-btn');
+    if (b) b.addEventListener('pointerdown', function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+      setCamera(LG.Settings.camera() % 5 + 1, true);
+    });
+    for (var i = 1; i <= 5; i++) (function (n) {
+      var sb = document.getElementById('settings-cam-' + n);
+      if (sb) sb.addEventListener('click', function () { LG.Audio.sfx.click(); setCamera(n, false); });
+    })(i);
+    // keyboard: C cycles
+    window.addEventListener('keydown', function (e) {
+      if ((e.key === 'c' || e.key === 'C') && UIState === 'match' && !e.repeat) setCamera(LG.Settings.camera() % 5 + 1, true);
+    });
+    refreshCamButton();
+  }
+
   // ---------------- Build 6: FRIEND MATCH screen ----------------
   function bindFriendUI() {
     var $ = function (id) { return document.getElementById(id); };
@@ -967,6 +1008,7 @@
   // ---------------- match settings (Time of Day / View) ----------------
   function bindSettingsUI() {
     bindFriendUI();
+    bindCameraUI();
     function on(id, fn) {
       var b = document.getElementById(id);
       if (!b) return;
@@ -1896,6 +1938,8 @@
     document.getElementById('controls').classList.toggle('hidden', !on);
     document.getElementById('scoreboard').classList.toggle('hidden', !on);
     document.getElementById('pause-btn').classList.toggle('hidden', !on);
+    var cb = document.getElementById('cam-btn'); if (cb) cb.classList.toggle('hidden', !on);
+    refreshCamButton();
     document.getElementById('coin-chip').classList.toggle('hidden', false);
     var overlays = ['menu-overlay', 'mode-overlay', 'challenge-pick-overlay', 'tournament-overlay', 'diff-overlay', 'select-overlay', 'style-overlay', 'court-overlay', 'setup-overlay', 'how-overlay', 'settings-overlay', 'about-overlay', 'profile-overlay', 'challenges-overlay', 'pause-overlay', 'result-overlay', 'friend-overlay'];
     for (var i = 0; i < overlays.length; i++) document.getElementById(overlays[i]).classList.add('hidden');
@@ -1908,6 +1952,7 @@
     document.getElementById('controls').classList.add('hidden');
     document.getElementById('scoreboard').classList.add('hidden');
     document.getElementById('pause-btn').classList.add('hidden');
+    var cbm = document.getElementById('cam-btn'); if (cbm) cbm.classList.add('hidden');
   }
 
   function showOverlay(id, on) {
@@ -2221,8 +2266,19 @@
   function loop() {
     requestAnimationFrame(loop);
     var now = nowSec();
-    var dt = U.clamp(now - lastNow, 0, 0.05);
+    // Build 7: the game clock no longer slows down on a slow phone. Frames
+    // used to be clamped to 1/20 s, so at 15 fps the whole match ran at 75%
+    // speed (the "sluggish on mobile" feeling). Now a long frame is kept
+    // (up to 1/10 s) and the GAMEPLAY is split into equal sub-steps of at
+    // most 1/30 s, so collisions and the ball stay accurate.
+    var rawDt = U.clamp(now - lastNow, 0, 0.1);
+    var dt = rawDt;
     lastNow = now;
+    if (LG.Perf) {
+      LG.Perf.frame(rawDt, UIState === 'match');
+      // the governor moved the render scale: resize the drawing buffer
+      if (LG.Perf.scale() !== lastPerfScale) { lastPerfScale = LG.Perf.scale(); scheduleViewportLayout(); }
+    }
 
     LG.Input.setEnabled(UIState === 'match');
     LG.Input.update(now);
@@ -2239,7 +2295,14 @@
     updateRotate();
 
     if (UIState === 'match') {
-      match.update(dt);
+      var subs = rawDt > 1 / 30 ? Math.min(3, Math.ceil(rawDt * 30)) : 1;
+      var sdt = rawDt / subs;
+      for (var si = 0; si < subs && match; si++) {
+        match._skipAnim = si < subs - 1;
+        match.update(sdt);
+      }
+      if (match) match._skipAnim = false;
+      if (!match) return;
       // camera: while the goal cinematic owns it, camCtrl.update must not
       // run — it would overwrite the cinematic pose in the same frame
       if (LG.GoalCinematic && LG.GoalCinematic.active()) {
@@ -2307,7 +2370,10 @@
       if (lc.f && Math.abs(camera.fov - lc.f) > 0.01) { camera.fov = lc.f; camera.updateProjectionMatrix(); }
     }
 
-    renderer.render(scene, camera);
+    // the camera chip follows the setting however it changed (settings
+    // screen, the C key, a test) — one int compare per frame
+    if (UIState === 'match' && LG.Settings.camera && LG.Settings.camera() !== shownCam) refreshCamButton();
+    if (LG.Post) LG.Post.render(rawDt); else renderer.render(scene, camera);
   }
 
   // PWA service worker registration. A phone that has already run an older

@@ -725,6 +725,46 @@ LG.Athlete = (function () {
       }
       if (emo) setW(acts[emo.n], emo.w * (1 - (shot ? shot.w : 0)));
       mixer.update(dt);
+      applyLean(dt, spd, f, over);
+    }
+
+    // ---- Build 7 PROCEDURAL LEAN (layered on the authored clips) ----
+    // The clips are authored on a straight line at constant speed. Real
+    // runners lean INTO a curve (centripetal) and pitch forward when they
+    // accelerate, back when they brake. Measured from the body's actual
+    // motion and added on top of the mixer pose: pelvis rolls the whole body
+    // into the turn, the spine takes the pitch, the head counters a little
+    // to keep the gaze level. Cleared to zero during one-shots/emotes.
+    var leanR = 0, leanP = 0, lastSpd = null, accS = 0;
+    var bPelvis = bone(m.scene, 'pelvis'), bSpine = bone(m.scene, 'spine_02'), bHead = bone(m.scene, 'neck_01');
+    var _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _ax = new THREE.Vector3();
+    function addWorldRot(b, ax, ang) {
+      if (!b || !b.parent || Math.abs(ang) < 1e-4) return;
+      b.parent.getWorldQuaternion(_pq);
+      _ax.copy(ax).applyQuaternion(_pq.invert());          // world axis -> parent space
+      _q.setFromAxisAngle(_ax, ang);
+      b.quaternion.premultiply(_q);
+    }
+    var _fw = new THREE.Vector3(), _rt = new THREE.Vector3();
+    function applyLean(dt, spd, f, over) {
+      // dt 0 (a second pose in the same frame) re-applies the current lean
+      if (dt > 0) {
+        if (lastSpd === null) lastSpd = spd;
+        var a = (spd - lastSpd) / dt; lastSpd = spd;
+        accS = approach(accS, Math.max(-14, Math.min(14, a)), 10, dt);
+        var lat = spd * turnRate;                            // centripetal accel (m/s^2)
+        var free = 1 - Math.min(1, over * 1.5);
+        leanR = approach(leanR, Math.max(-0.26, Math.min(0.26, -lat * 0.016)) * free, 9, dt);
+        leanP = approach(leanP, Math.max(-0.1, Math.min(0.16, accS * 0.022)) * free, 8, dt);
+      }
+      if (Math.abs(leanR) + Math.abs(leanP) < 0.004) return;
+      _fw.set(Math.sin(f), 0, Math.cos(f));
+      _rt.set(Math.cos(f), 0, -Math.sin(f));
+      addWorldRot(bPelvis, _fw, leanR * 0.65);
+      addWorldRot(bSpine, _fw, leanR * 0.35);
+      addWorldRot(bSpine, _rt, leanP);
+      addWorldRot(bHead, _fw, -leanR * 0.4);
+      addWorldRot(bHead, _rt, -leanP * 0.6);
     }
 
     var api = {
@@ -769,6 +809,7 @@ LG.Athlete = (function () {
         } catch (e) { fails++; lastError = e.message; return false; }
       },
       step: function (rdt, p) { try { advance(rdt, p); } catch (e) { fails++; lastError = e.message; } return true; },
+      lean: function () { return { roll: leanR, pitch: leanP }; },
       update: function (dt, p) {
         var t = nowMs();
         var rdt = last ? Math.min(0.1, (t - last) / 1000) : 0;

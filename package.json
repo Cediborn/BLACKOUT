@@ -1,18 +1,19 @@
 {
   "name": "blackout",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "description": "BLACKOUT — 3v3 street football with goalkeepers (static browser game, no build step)",
   "scripts": {
-    "test": "npm run test:sim && npm run test:boot && npm run test:probes && npm run test:build3 && npm run test:build5 && npm run test:build6 && npm run test:friend",
+    "test": "npm run test:sim && npm run test:boot && npm run test:probes && npm run test:build3 && npm run test:build5 && npm run test:build6 && npm run test:build7 && npm run test:friend",
     "test:sim": "node tools/sim.js",
     "test:boot": "node tools/boot.js",
-    "test:probes": "node tools/cinprobe.js && node tools/celebprobe.js && node tools/feelprobe.js && node tools/reactprobe.js && node tools/athleteprobe.js",
+    "test:probes": "node tools/cinprobe.js && node tools/celebprobe.js && node tools/feelprobe.js && node tools/reactprobe.js && node tools/athleteprobe.js && node tools/skillprobe.js && node tools/netprobe.js",
     "test:build3": "node tools/look.js tools/looks/build3.js --out looks-out/build3",
     "serve": "python3 -m http.server 8080",
     "look": "node tools/look.js",
     "test:build5": "node tools/look.js tools/looks/menus.js --out looks-out/build5",
     "test:build6": "node tools/look.js tools/looks/build6.js --out looks-out/build6",
-    "test:friend": "node tools/look.js tools/looks/friend.js --query net=bc --size 560x360 --out looks-out/friend"
+    "test:friend": "node tools/look.js tools/looks/friend.js --query net=bc --size 560x360 --out looks-out/friend",
+    "test:build7": "node tools/look.js tools/looks/build7.js --out looks-out/build7"
   }
 }

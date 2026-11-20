@@ -257,8 +257,8 @@ check(vis('menu-overlay'), 'main menu ends up visible');
 check(vis('loading-overlay'),
   'the boot cover is still up before the first frame (it lifts only after a real render)');
 var vp0 = window.LGMain.getViewport();
-check(vp0.w === window.innerWidth && vp0.h === window.innerHeight && vp0.dpr === 2,
-  'startup sized the renderer from the real viewport (pixel ratio capped at 2)', JSON.stringify(vp0));
+check(vp0.w === window.innerWidth && vp0.h === window.innerHeight && vp0.dpr === Math.min(3, LG.Settings.qualityProfile(true).dprCap),
+  'startup sized the renderer from the real viewport (pixel ratio capped at the quality cap — 1.5 on a MEDIUM phone, Build 7)', JSON.stringify(vp0));
 
 section('1b. court registration + metadata are the single source of truth');
 (function () {
@@ -748,7 +748,7 @@ section('4b. viewport layout is one centralised pipeline');
     vp.applies - before.applies);
   check(vp.w === 900 && vp.h === 420, 'the relayout read the size the browser reports now',
     vp.w + 'x' + vp.h);
-  check(vp.dpr === 2, 'devicePixelRatio reaches the renderer, capped at 2', vp.dpr);
+  check(vp.dpr === LG.Settings.qualityProfile(true).dprCap, 'devicePixelRatio reaches the renderer, capped at the quality cap', vp.dpr);
 
   // fullscreen announces itself; it must relayout WITHOUT asking for fullscreen
   var fs0 = fsCalls;
@@ -863,6 +863,9 @@ section('5. match settings are wired into the real game state');
   check(LG.Settings.timeOfDay() === 'day' && LG.Lighting.mode() === 'day',
     'DAY button restored the lighting');
 
+  // Build 7: the original framing is camera 2 (WIDE TACTICAL); pin it for
+  // the exact-pose checks below, then prove all five presets afterwards
+  LG.Settings.setCamera(2);
   // VIEW drives the match camera framing (the visible gameplay change)
   var probe = new LG.MatchCamera({ aspect: 1.9 });   // wide canvas, on purpose
   LG.Settings.setView('portrait');
@@ -928,6 +931,37 @@ section('5. match settings are wired into the real game state');
   var lu = mm.screenToWorldMove({ x: 0, y: 1 });
   check(lr.x === 0 && lr.z === -1 && lu.x === -1 && lu.z === 0,
     'LANDSCAPE input: right = -z (attack screen-right), up = -x (far touchline)');
+
+  // Build 7: FIVE camera presets — genuinely different poses, same screen
+  // axes per view, smooth blend on a switch, remembered in the settings
+  ['landscape', 'portrait'].forEach(function (view) {
+    LG.Settings.setView(view);
+    var poses = [];
+    for (var cn = 1; cn <= 5; cn++) {
+      LG.Settings.setCamera(cn);
+      camCtrl.reset();
+      for (var fi = 0; fi < 5; fi++) camCtrl.update(0.02, 0, 0, 0, 0);
+      poses.push({ x: rec.position.x, y: rec.position.y, z: rec.position.z, fov: rec.fov });
+    }
+    var heights = poses.map(function (p) { return p.y; });
+    var dists = poses.map(function (p) { return view === 'landscape' ? p.x : p.z; });
+    var distinct = poses.every(function (p, i) { return poses.every(function (q, j) { return i === j || Math.abs(p.y - q.y) + Math.abs(p.x - q.x) + Math.abs(p.z - q.z) + Math.abs(p.fov - q.fov) > 1; }); });
+    check(distinct, view.toUpperCase() + ': five genuinely different camera poses', JSON.stringify(poses.map(function (p) { return [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), +p.fov.toFixed(0)]; })));
+    check(dists[3] < dists[2] && dists[4] < dists[3] && heights[4] < heights[3] && heights[3] < heights[2],
+      view.toUpperCase() + ': DYNAMIC -> CLOSE ACTION -> PLAYER FOCUS step closer and lower');
+    check(view === 'landscape' ? poses.every(function (p) { return p.x > 0; }) : poses.every(function (p) { return p.z > 0; }),
+      view.toUpperCase() + ': every preset keeps the same screen axes (controls never flip)');
+  });
+  LG.Settings.setView('landscape');
+  LG.Settings.setCamera(5); camCtrl.reset();
+  LG.Settings.setCamera(1);
+  camCtrl.update(0.02, 0, 0, 0, 0);
+  var mid = rec.position.x;
+  check(mid > 7.7 && mid < 30, 'switching presets blends (no cut): one frame later the camera is between them', mid.toFixed(2));
+  for (var bf = 0; bf < 200; bf++) camCtrl.update(0.02, 0, 0, 0, 0);
+  check(Math.abs(rec.position.x - 36) < 0.5, '...and settles on the new preset', rec.position.x.toFixed(2));
+  check(LG.Settings.snapshot().camera === 1, 'the camera choice is saved with the settings');
+  LG.Settings.setCamera(3);
 })();
 
 section('6. rematch + return to menu keep the session choices (no re-config)');

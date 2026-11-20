@@ -57,6 +57,9 @@
   <!-- ================= HUD ================= -->
   <div id="coin-chip" class="hidden"><span class="coin"></span><span id="coin-amnt">0</span></div>
   <button id="pause-btn" class="hidden" title="Pause">II</button>
+  <div id="net-chip" class="hidden" role="status">WEAK SIGNAL</div>
+  <!-- Build 7: cycle the five match cameras without leaving play -->
+  <button id="cam-btn" class="hidden" type="button" aria-label="Change camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="3.6"/></svg><span id="cam-num">3</span></button>
 
   <div id="mode-chip" class="hidden"></div>
 
@@ -127,6 +130,7 @@
       <button id="btn-sprint">SPRINT</button>
       <button id="btn-pass" class="primary">PASS</button>
       <button id="btn-switch">SWITCH</button>
+      <button id="btn-skill" type="button" aria-label="Skill move">SKILL</button>
     </div>
     <div id="special-wrap">
       <button id="special-btn"><div class="fill"></div><span class="lbl">SPECIAL</span></button>
@@ -187,7 +191,7 @@
         <button id="btn-how" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 0c0 2-2.5 2-2.5 4M12 17h.01"/></svg>HOW TO PLAY</button>
         <button id="btn-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>SETTINGS</button>
         <button id="btn-about" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>ABOUT</button>
-        <span class="menu-version" id="menu-version">v1.6.0</span>
+        <span class="menu-version" id="menu-version">v1.7.0</span>
       </nav>
     </div>
   </div>
@@ -488,6 +492,8 @@
           <div class="help-row"><span class="help-key">A / I / SPACE</span><span class="help-desc"><b>PASS</b> when you have the ball · <b>SWITCH</b> when defending</span></div>
           <div class="help-row"><span class="help-key">S / K</span><span class="help-desc"><b>SHOOT</b> (hold to charge) when attacking · <b>TACKLE</b> when defending</span></div>
           <div class="help-row"><span class="help-key">Q</span><span class="help-desc"><b>Special</b> — when the meter is full</span></div>
+          <div class="help-row"><span class="help-key">F / U</span><span class="help-desc"><b>SKILL</b> — the arrows pick it: none/forward feint · back drag back · sideways roulette · forward + sprint rainbow flick. Hold while charging SHOOT for a finesse curl</span></div>
+          <div class="help-row"><span class="help-key">C</span><span class="help-desc">Change camera (5 views)</span></div>
           <div class="help-row"><span class="help-key">P / ESC</span><span class="help-desc">Pause · <b>R</b> rematch on results</span></div>
         </div>
         <div class="help-section" data-how="controls-mobile">
@@ -497,6 +503,8 @@
           <div class="help-row"><span class="help-key">SHOOT</span><span class="help-desc">Attack: charged strike · Defense: tackle</span></div>
           <div class="help-row"><span class="help-key">SPRINT</span><span class="help-desc">Hold to burn stamina for pace</span></div>
           <div class="help-row"><span class="help-key">SPECIAL</span><span class="help-desc">Fires when the meter is full</span></div>
+          <div class="help-row"><span class="help-key">SKILL</span><span class="help-desc">Attack: the stick picks the move (feint, drag back, roulette, + SPRINT rainbow flick). Hold with SHOOT for a finesse curl. Hold SHOOT as a pass arrives to hit it first time</span></div>
+          <div class="help-row"><span class="help-key">📷</span><span class="help-desc">The camera chip by PAUSE cycles 5 views</span></div>
           <div class="help-row"><span class="help-desc">Action buttons flip between <b>PASS | SHOOT</b> (attacking) and <b>SWITCH | TACKLE</b> (defending) based on who has the ball</span></div>
         </div>
         <div class="help-divider"></div>
@@ -561,6 +569,15 @@
         </div>
         <div class="help-section" data-settings="display">
           <div class="help-section-title">DISPLAY</div>
+          <div class="help-row"><span class="help-key">CAMERA</span>
+            <span class="option-row cam-row" role="group" aria-label="Match camera">
+              <button class="option-btn" id="settings-cam-1" type="button" title="Tele broadcast">1 TELE</button>
+              <button class="option-btn" id="settings-cam-2" type="button" title="Wide tactical">2 WIDE</button>
+              <button class="option-btn" id="settings-cam-3" type="button" title="Dynamic broadcast">3 DYNAMIC</button>
+              <button class="option-btn" id="settings-cam-4" type="button" title="Close action">4 CLOSE</button>
+              <button class="option-btn" id="settings-cam-5" type="button" title="Player focus">5 FOCUS</button>
+            </span>
+          </div>
           <div class="help-row"><span class="help-key">TIME</span>
             <span class="option-row" role="group" aria-label="Time of day">
               <button class="option-btn" id="settings-day" type="button">DAY</button>
@@ -625,7 +642,7 @@
         <div class="help-section" data-about="about">
           <div class="help-section-title">ABOUT</div>
           <div class="help-row"><span class="help-key">GAME</span><span class="help-desc">BLACKOUT is a 3V3 street football game with goalkeepers — quick matches, focused challenges and a four-team Street Cup.</span></div>
-          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.6.0</b></span></div>
+          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.7.0</b></span></div>
           <div class="help-row"><span class="help-key">RUN</span><span class="help-desc">Plays fully offline after the first load. No account, no server, no purchases.</span></div>
         </div>
         <div class="help-section" data-about="credits">
@@ -637,6 +654,7 @@
           <div class="help-row"><span class="help-key">SFX</span><span class="help-desc">Procedural Web Audio — every sound effect and the crowd are generated in code</span></div>
           <div class="help-row"><span class="help-key">MUSIC</span><span class="help-desc">Menu tracks created with Google generative AI (marked by embedded Content Credentials)</span></div>
           <div class="help-row"><span class="help-key">ONLINE</span><span class="help-desc">PeerJS 1.5.5 (MIT, Michelle Bu &amp; Eric Zhang) and the free PeerJS broker, used only to swap the friend-match code — see lib/peerjs.LICENSE</span></div>
+          <div class="help-row"><span class="help-key">GFX</span><span class="help-desc">postprocessing 6.33 (Zlib, Raoul van R&uuml;schen / pmndrs) for bloom, tone mapping, SMAA and the broadcast grade — see lib/postprocessing.LICENSE.md</span></div>
           <div class="help-row"><span class="help-key">FONTS</span><span class="help-desc">Anton (The Anton Project Authors) and Barlow / Barlow Condensed (The Barlow Project Authors), SIL Open Font License 1.1 — see fonts/OFL.txt</span></div>
           <div class="help-row"><span class="help-key">ART</span><span class="help-desc">Court art, murals and UI treatment created for this project</span></div>
           <div class="help-row"><span class="help-key">CODE</span><span class="help-desc">Gameplay, AI, progression and UI written for BLACKOUT</span></div>
@@ -792,6 +810,7 @@
   </div>
 
   <script src="lib/three.min.js"></script>
+  <script src="lib/postprocessing.min.js"></script>
 <script src="lib/GLTFLoader.js"></script>
   <script>
     // Colour pipeline: hex colours and every colour map in the game are sRGB,
@@ -801,7 +820,7 @@
     if (window.THREE && THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 
     // Single early version stamp so a failed boot still shows a real number.
-    window.BLOCKOUT_VERSION = '1.6.0';
+    window.BLOCKOUT_VERSION = '1.7.0';
     window.addEventListener('error', function (e) {
       try {
         var box = document.getElementById('loading-error');
@@ -847,12 +866,14 @@
   <script src="js/athlete.js"></script>
   <script src="js/ball.js"></script>
   <script src="js/player.js"></script>
+  <script src="js/skills.js"></script>
   <script src="js/vehicles.js"></script>
   <script src="js/arena.js"></script>
   <script src="js/abilities.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/keeper.js"></script>
   <script src="js/camera.js"></script>
+  <script src="js/batch.js"></script>
   <script src="js/lighting.js"></script>
   <script src="js/weather.js"></script>
   <script src="js/match.js"></script>
@@ -865,6 +886,8 @@
   <script src="js/reactions.js"></script>
   <script src="js/hud.js"></script>
   <script src="js/hub.js"></script>
+  <script src="js/perf.js"></script>
+  <script src="js/post.js"></script>
   <script src="js/main.js"></script>
   <script src="js/streetlife.js"></script>
   <script src="js/living.js"></script>

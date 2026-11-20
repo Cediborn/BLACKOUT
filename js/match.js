@@ -503,6 +503,8 @@ LG.MatchManager.prototype = {
         this.updatePlayers(dt);
         // Build 6: the CPU side fires its special moves too
         if (LG.AISpecials) LG.AISpecials.update(this, dt);
+        // Build 7: CPU carriers use skill moves under pressure
+        if (LG.Skills && LG.Config.skills && LG.Config.skills.ai) LG.Skills.aiTick(this, dt);
         if (!this.goldenGoal && this.clock <= 0) {
           // a tie at 0:00 in a mode that allows it plays on: next goal wins
           if (this.opts.goldenGoal && this.score[0] === this.score[1]) this.startGoldenGoal();
@@ -664,6 +666,11 @@ LG.MatchManager.prototype = {
       h.activateAbility();
     }
 
+    // Build 7 SKILL MOVES: the stick picks the move (see js/skills.js)
+    if (inp.pressed('skill') && LG.Skills) LG.Skills.start(this, h, wv, inp.down('sprint'));
+    // a first-time/volley strike locks SHOOT until it is released
+    if (h._ftLock && !inp.down('shoot')) h._ftLock = false;
+
     // CONTEXT-SENSITIVE CONTROLS — one control does both jobs depending on who
     // has the ball. While MY team carries it (any teammate, not just the human)
     // the pass/shoot keys and buttons are PASS | SHOOT. While the opponent
@@ -688,13 +695,21 @@ LG.MatchManager.prototype = {
       // shoot: charge while held, fire on release. A press that is already
       // released by the next edge still starts a charge so a quick tap
       // becomes a real shot instead of nothing.
-      if (inp.down('shoot') || inp.pressed('shoot')) {
+      if (h._ftLock) {
+        // already struck first time: this hold is spent
+      } else if (inp.down('shoot') || inp.pressed('shoot')) {
         if (h.hasBall) h.shotCharge = Math.min(1, h.shotCharge + dt * (LG.Config.physics.shootChargeRate || 2.8));
+        else h.shotCharge = Math.min(1, h.shotCharge + dt * (LG.Config.physics.shootChargeRate || 2.8) * 0.8);
         h.wasShooting = true;
+        // SKILL held while charging = a FINESSE (placed, curled) finish
+        if (inp.down('skill')) h._finesse = true;
+        // SHOOT held as the ball ARRIVES: strike it first time / on the volley
+        if (!h.hasBall && LG.Skills && LG.Skills.firstTime(this, h, h.shotCharge)) { h.shotCharge = 0; }
       } else if (h.wasShooting) {
         this.fireHumanShot(h);
         h.shotCharge = 0;
         h.wasShooting = false;
+        h._finesse = false;
       }
     } else {
       // a charge interrupted when the ball was lost must not misfire later
@@ -817,6 +832,8 @@ LG.MatchManager.prototype = {
     this.possessionTeam = -1;
     // never leave a phantom owner on the ball (frozen physics / wrong control mode)
     if (this.ball.owner === p) this.ball.owner = null;
+    // the next time anyone collects it, that is a fresh first touch
+    if (this.ball._carrier === p) this.ball._carrier = null;
   },
 
   // ------------------------------------------------------------
@@ -1015,6 +1032,8 @@ LG.MatchManager.prototype = {
       var sx = Math.sin(ang) * dd, szl = Math.cos(ang) * dd;
       this.release(h);
       this.ball.kick((sx / dd) * sp, (0.18 + power * 0.26), (szl / dd) * sp);
+      if (h._finesse && LG.Skills && !perfect) LG.Skills.finesse(this, h, this.ball, goal);
+      h._finesse = false;
       h.kickAnim = 1;
       this.ball.lastKicker = h;
       this.      ball.kickT = 0.35;
@@ -1117,6 +1136,8 @@ LG.MatchManager.prototype = {
         chance *= 1.15;            // meeting the carrier head-on is a fair fight
       }
       chance = U.clamp(chance, 0.04, 0.96);
+      // a roulette spun into the challenge rides it (js/skills.js)
+      if (LG.Skills && LG.Skills.evades(victim)) chance = Math.min(chance, 0.06);
 
       // GOALKEEPERS IN POSSESSION ARE PROTECTED — during the short save/save
       // transition the ball cannot be stripped at all (the keeper is still
@@ -1275,6 +1296,10 @@ LG.MatchManager.prototype = {
       if (p.hasBall) continue;
       // a freshly-tackled player can't instantly scoop the ball back
       if (ball.noPk === p && ball.noPkT > 0) continue;
+      // a ball sailing over head height (a rainbow flick, a lob) can't be
+      // collected by an outfielder's feet, nor one still climbing steeply off
+      // a flick; keepers have their own rules
+      if (!p.isGoalkeeper && (ball.y > 1.55 || (ball.y > 0.95 && ball.vy > 3))) continue;
       d = p.distTo(ball.x, ball.z);
       R = p.radius + ball.r + 0.06;
       // swept contact: a fast ball can cross a standing body entirely within a
@@ -1366,17 +1391,58 @@ LG.MatchManager.prototype = {
     // keeps the feel win and the sim suite green.)
     var sp = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
     var ahead = 0.72 + Math.min(0.2, Math.max(0, sp - 2) * 0.04);
-    var bx = p.x + Math.sin(p.facing) * ahead;
-    var bz = p.z + Math.cos(p.facing) * ahead;
-    var wantY = ball.r + (p.sprinting || p.active ? 0.05 : 0);
+    var side = 0, lift = 0, rhythm = 0, vx0 = 0, vz0 = 0;
+    // Build 7 DRIBBLE RHYTHM: on the run the ball is TOUCHED out in front
+    // once per stride and the body catches up to it — instead of a ball glued
+    // at a fixed distance. PRESENTATION ONLY: it moves the drawn ball, never
+    // ball.x/z, so the carry every tackle and pass is built on is unchanged.
+    if (sp > 2.2 && dt > 0) {
+      var stride = p.sprinting ? 2.5 : 1.8;
+      p._touchD = (p._touchD || 0) + sp * dt;
+      if (p._touchD > stride) p._touchD -= stride;
+      var ph = p._touchD / stride;
+      // touched out (+), then the stride closes on it (-)
+      rhythm = 0.3 * Math.min(1, sp / 6.5) * ((1 - ph) * (1 - ph) - 0.45);
+    } else if (dt > 0) p._touchD = 0;
+    // SHIELDING: standing on the ball with a challenger close, the body turns
+    // to put itself between the ball and him, ball on the far foot
+    if (sp < 1.6 && !p._skill && dt > 0 && this.opponents) {
+      var opp = this.opponents(p), sh = null, sd = 1.7;
+      for (var oi = 0; oi < opp.length; oi++) { var od = p.distTo(opp[oi].x, opp[oi].z); if (od < sd && !opp[oi].isGoalkeeper) { sd = od; sh = opp[oi]; } }
+      p._shielding = !!sh;
+      if (sh && !(p.isHuman && Math.abs(p.want.x) + Math.abs(p.want.z) > 0.2)) {
+        // side-on, not back-to: a real shielding stance. It costs a tackler
+        // his head-on bonus but never makes the ball untouchable
+        var toT = Math.atan2(sh.x - p.x, sh.z - p.z);
+        var c1 = toT + Math.PI / 2, c2 = toT - Math.PI / 2;
+        var d1 = Math.atan2(Math.sin(c1 - p.facing), Math.cos(c1 - p.facing));
+        var d2 = Math.atan2(Math.sin(c2 - p.facing), Math.cos(c2 - p.facing));
+        var dfa = Math.abs(d1) < Math.abs(d2) ? d1 : d2;
+        p.facing += dfa * Math.min(1, dt * 4);
+        ahead = 0.6;
+      }
+    } else p._shielding = false;
+    var ssp = LG.Skills && LG.Skills.ballSpot(p);
+    if (ssp) { ahead = ssp.ahead; side = ssp.side; lift = ssp.lift; }
+    var bx = p.x + Math.sin(p.facing) * ahead + Math.cos(p.facing) * side;
+    var bz = p.z + Math.cos(p.facing) * ahead - Math.sin(p.facing) * side;
+    var wantY = ball.r + (p.sprinting || p.active ? 0.05 : 0) + lift;
     if (p.active && p.active.type === 'DRIBBLE_RUSH') wantY = ball.r + 0.16;
     ball.y = LG.Util.lerp(ball.y, wantY, Math.min(1, dt * 14));
+    // FIRST TOUCH: a ball that just arrived is cushioned into the stride
+    // over ~0.18 s from where it met the body, not teleported to the feet
+    if (ball._carrier !== p) { ball._carrier = p; ball._cushT = 0.18; ball._cx = ball.x - bx; ball._cz = ball.z - bz; }
+    if (ball._cushT > 0 && dt > 0) {
+      ball._cushT = Math.max(0, ball._cushT - dt);
+      var ck = ball._cushT / 0.18;
+      vx0 = ball._cx * ck * ck; vz0 = ball._cz * ck * ck;   // drawn only, like the rhythm
+    }
     ball.x = bx;
     ball.z = bz;
     ball.vx = p.vx;
     ball.vz = p.vz;
     ball.vy = 0;
-    ball.mesh.position.set(ball.x, ball.y, ball.z);
+    ball.mesh.position.set(ball.x + Math.sin(p.facing) * rhythm + vx0, ball.y, ball.z + Math.cos(p.facing) * rhythm + vz0);
     this.possessionTeam = p.team;
   },
 

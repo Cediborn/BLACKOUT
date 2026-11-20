@@ -2338,7 +2338,7 @@ section('24. street twist — bends Config for one match, always restores it');
   var big = newMatch('blaze');
   assert(Math.abs(big.ball.r - 0.5) < 1e-9, 'big ball really builds a bigger ball', big.ball.r);
   LG.Modes.applyTwist('turbo');
-  var fast = newMatch('blaze'), base = 4.2 + LG.byId('blaze').stats.speed * 0.32;
+  var fast = newMatch('blaze'), base = (4.2 + LG.byId('blaze').stats.speed * 0.32) * (LG.Config.player.pace || 1);
   assert(Math.abs(fast.home[0].maxSpeed - base * 1.28) < 1e-9, 'turbo makes everyone faster', fast.home[0].maxSpeed);
   LG.Modes.applyTwist('soap');
   assert(P.groundDrag > d0, 'soap floor makes the court slippery', P.groundDrag);

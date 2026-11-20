@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v23';   // Build 6 — court+conditions, shootout/yard/rumble, CPU specials, keeper dives, friend match
+var CACHE_NAME = 'blackout-v24';   // Build 7 — speed/perf, smooth online sync, 5 cameras, skill moves, postprocessing
 var ASSETS = [
   './',
   './index.html',
@@ -67,6 +67,7 @@ var ASSETS = [
   './js/athlete.js',
   './js/ball.js',
   './js/player.js',
+  './js/skills.js',
   './js/vehicles.js',
   './js/arena.js',
   './js/abilities.js',
@@ -87,10 +88,14 @@ var ASSETS = [
   './js/crowd.js',
   './js/hud.js',
   './js/hub.js',
+  './js/batch.js',
+  './js/perf.js',
+  './js/post.js',
   './js/main.js',
   './js/streetlife.js',
   './js/living.js',
   './lib/three.min.js',
+  './lib/postprocessing.min.js',
   './lib/GLTFLoader.js',
   './3d/soap_soccer_player.glb',
   './3d/athlete.glb',

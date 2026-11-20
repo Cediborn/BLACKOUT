@@ -19,7 +19,7 @@ LG.Input = (function () {
   // Movement / sprint / pause stay edge-of-frame — buffering them would feel
   // like input lag.
   var BUFFER = 0.18;
-  var BUF_ACTION = { pass: 1, shoot: 1, tackle: 1, switch: 1, special: 1, rematch: 1 };
+  var BUF_ACTION = { pass: 1, shoot: 1, tackle: 1, switch: 1, special: 1, rematch: 1, skill: 1 };
   var buf = {};
 
   // joystick
@@ -54,6 +54,7 @@ LG.Input = (function () {
       case 'KeyA': case 'KeyI': case 'Space': case 'KeyJ': return 'pass';
       case 'KeyS': case 'KeyK': return 'shoot';
       case 'KeyQ': return 'special';
+      case 'KeyF': case 'KeyU': return 'skill';
       case 'KeyP': case 'Escape': return 'pause';
       case 'KeyR': return 'rematch';
     }
@@ -170,7 +171,7 @@ LG.Input = (function () {
   }
 
   function bindButtons() {
-    var ids = ['pass', 'shoot', 'tackle', 'sprint', 'switch'];
+    var ids = ['pass', 'shoot', 'tackle', 'sprint', 'switch', 'skill'];
     for (var i = 0; i < ids.length; i++) {
       (function (name, btn) {
         if (!btn) return;

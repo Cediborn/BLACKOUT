@@ -45,7 +45,7 @@ module.exports = async function (A) {
   // (two software-rendered games share one CPU here: frames are slow, so
   // waits are long; on phones this is instant)
   await A.until("LGMain.getMatch().state === 'PLAY'", 90000);
-  await B.until("LG.Net._snaps().length > 5", 60000);
+  await B.until("LG.Net.syncInfo().stats.snaps > 5", 60000);
   check(true, 'B receives the host\'s snapshots');
 
   // B pushes its stick: the friend's player moves on A
@@ -62,6 +62,9 @@ module.exports = async function (A) {
   var posB = JSON.parse(await B.eval("JSON.stringify([LGMain.getMatch().away[0].x, LGMain.getMatch().away[0].z])"));
   check(Math.hypot(posA[0] - posB[0], posA[1] - posB[1]) < 2.5, 'B draws the player where the host has it');
   await B.eval("LG.Input.moveVec = function () { return { x: 0, y: 0 }; }; true");
+  var si = JSON.parse(await B.eval("JSON.stringify(LG.Net.syncInfo())"));
+  check(si.delay >= 0.08 && si.delay <= 0.4, 'B renders behind a measured buffer (' + Math.round(si.delay * 1000) + ' ms, jitter ' + Math.round(si.jitter * 1000) + ' ms)');
+  check(si.stats.snapCorr <= 2, 'B\'s own star needed at most a couple of hard corrections (' + si.stats.snapCorr + ')');
   await B.shot('f02_guest_view');
   await A.shot('f03_host_view');
 

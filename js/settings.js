@@ -13,6 +13,7 @@ LG.Settings = (function () {
     weather: 'dry',       // 'dry' | 'rain' | 'fog' | 'wind'  (Build 5/6)
     crowd: 'packed',      // 'empty' | 'locals' | 'busy' | 'packed'  (Build 6)
     life: 'full',         // 'off' | 'low' | 'med' | 'full'  (Build 6)
+    camera: 3,            // 1..5 match camera preset (Build 7) — DYNAMIC BROADCAST
     view: 'landscape',    // 'portrait' | 'landscape' (existing mobile default was landscape)
     volMaster: 0.55,      // 0..1 — historical master gain default
     volSfx: 1,            // 0..1 — procedural blips / kicks / whistle
@@ -45,6 +46,7 @@ LG.Settings = (function () {
         if (WEATHER.indexOf(p.weather) >= 0) data.weather = p.weather;
         if (CROWD.indexOf(p.crowd) >= 0) data.crowd = p.crowd;
         if (LIFE.indexOf(p.life) >= 0) data.life = p.life;
+        if (p.camera >= 1 && p.camera <= 5) data.camera = p.camera | 0;
         if (p.volMaster !== undefined) data.volMaster = num01(p.volMaster, data.volMaster);
         if (p.volSfx !== undefined) data.volSfx = num01(p.volSfx, data.volSfx);
         if (p.volCrowd !== undefined) data.volCrowd = num01(p.volCrowd, data.volCrowd);
@@ -90,6 +92,9 @@ LG.Settings = (function () {
     setCrowd: function (c) { if (CROWD.indexOf(c) >= 0) { data.crowd = c; save(); } return data.crowd; },
     // share of the stands filled for each crowd level
     crowdFrac: function () { return { empty: 0, locals: 0.3, busy: 0.7, packed: 1 }[data.crowd]; },
+    camera: function () { return data.camera; },
+    setCamera: function (n) { n = n | 0; if (n >= 1 && n <= 5) { data.camera = n; save(); } return data.camera; },
+    cycleCamera: function () { return this.setCamera(data.camera % 5 + 1); },
     life: function () { return data.life; },
     setLife: function (l) { if (LIFE.indexOf(l) >= 0) { data.life = l; save(); } return data.life; },
     lifeFrac: function () { return { off: 0, low: 0.35, med: 0.7, full: 1 }[data.life]; },
@@ -158,6 +163,7 @@ LG.Settings = (function () {
         weather: data.weather,
         crowd: data.crowd,
         life: data.life,
+        camera: data.camera,
         view: data.view,
         volMaster: data.volMaster,
         volSfx: data.volSfx,

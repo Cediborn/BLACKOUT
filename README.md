@@ -32,6 +32,21 @@ To film every menu and check the Build 5 screens (also part of `npm test`):
 node tools/look.js tools/looks/menus.js --out looks-out/build5
 ```
 
+## What's new in 1.7.0
+
+- **Faster, snappier play on phones:** quicker kick-offs, sharper acceleration and turning, and a slightly higher top pace (passes and shots kept their tuned speeds). A slow phone no longer plays in slow motion: the match clock stays real-time even at 20 fps. The stadium is batched (about 240 fewer draw calls a frame), phones render at 1.5x instead of 2x, and the resolution steps down on its own when a frame runs long.
+- **Smooth friend matches:** no more freeze-then-jump. Your friend's players are drawn a little behind real time and blended between updates, with a buffer that grows only when the connection is jittery; short dropouts are bridged by carrying everyone forward on their last motion. Your own player moves the instant you touch the stick and is gently corrected by the host. A WEAK SIGNAL chip shows when data stops. Updates are smaller (light 20 Hz updates, full ones 5 Hz) and inputs slow down while you are idle.
+- **Five cameras:** 1 TELE, 2 WIDE TACTICAL (the classic), 3 DYNAMIC, 4 CLOSE and 5 FOCUS. Each has its own height, distance, lens and follow feel, works in portrait and landscape, glides between choices, never backs into the stands and keeps the ball in shot. Change it with the camera chip beside PAUSE, the C key or SETTINGS; it is saved.
+- **Skill moves:** a SKILL button (keys F/U) takes SWITCH's place while you attack. The stick picks the move: none or forward for a BODY FEINT, back for a DRAG BACK, left/right for a ROULETTE, forward + SPRINT for a RAINBOW FLICK. Hold SKILL while charging SHOOT for a curled FINESSE shot; hold SHOOT as a pass arrives to strike it FIRST TIME or on the VOLLEY. The CPU uses them under pressure too. All moves have cooldowns and stamina costs, and they work in friend matches.
+- **Better bodies:** players lean into turns and pitch forward when they accelerate, the ball is touched ahead in stride, arriving balls are cushioned, and a pressed player turns side-on to shield.
+- **New graphics pipeline** ([pmndrs/postprocessing](https://github.com/pmndrs/postprocessing)): floodlight bloom, broadcast vignette and anti-aliasing on MEDIUM; HIGH adds a colour grade and SMAA. LOW stays without effects. Effects switch off by themselves while a phone is struggling.
+
+```sh
+npm run test:build7    # cameras, postprocessing, batching, skills in the real game
+node tools/netprobe.js # online sync under lag, jitter, loss and a stall
+node tools/skillprobe.js
+```
+
 ## What's new in 1.6.0
 
 - **Courts and conditions on one screen:** pick the court from a strip of tiles and set TIME (day, dusk, night, blackout), WEATHER (dry, rain, fog, wind), CROWD (empty to packed) and STREET LIFE (off to full) right beside it. A box explains what each pick changes on the pitch. Fog pulls the far end in; wind blows dust across and bends balls in the air.

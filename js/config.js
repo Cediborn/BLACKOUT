@@ -4,7 +4,7 @@
 var LG = window.LG = window.LG || {};
 
 LG.Config = {
-  version: '1.6.0',
+  version: '1.7.0',
 
   court: {
     width: 26,        // x extent (half = 13)
@@ -18,10 +18,10 @@ LG.Config = {
 
   match: {
     duration: 120,          // seconds per match (2:00)
-    kickoffDelay: 1.4,      // freeze before kickoff
+    kickoffDelay: 0.9,      // freeze before kickoff (Build 7: 1.4 -> 0.9, no dead air)
     goalDelay: 2.6,         // celebration pause after a goal
     goldenGoalMax: 90,      // longest sudden-death period after a tie (seconds)
-    endDelay: 2.2,
+    endDelay: 1.6,
     maxGoalsShown: 9,
     swapCooldown: 0.5,
   },
@@ -33,11 +33,15 @@ LG.Config = {
   // tackles, picks the ball up and collides. Bumping the size therefore
   // widens spacing exactly as much as it widens the silhouette.
   // ------------------------------------------------------------
+  // Build 7: skill moves (js/skills.js)
+  skills: { ai: true },
+
   player: {
     athlete: 1,         // Phase 11: 1 = realistic athlete body with real clips
                         // (js/athlete.js, 3d/athlete.glb); 0 = previous bodies.
                         // Try index.html?athlete=0 to compare.
     scale: 1.35,        // baseline — 1.35x the original body size
+    pace: 1.08,         // Build 7: every player 8% quicker (real pace at this body size)
     mobileScale: 1.05,  // extra bump on phones (small screens) -> ~1.42 total
     rig: 1,             // 1 = skinned humanoid rig (AnimationMixer) as the shipped
                         // default player system; 0 falls back to limb maths.
@@ -103,11 +107,11 @@ LG.Config = {
     passVyMax: 2.2,
     dribbleRadius: 0.85,    // ball rides in front of the carrier
 
-    playerAccel: 46,        // smooth: not twitchy, not sluggish
+    playerAccel: 54,        // Build 7: 46 -> 54 — quicker first steps, still weighted
     stopBoost: 1.6,         // extra bite when the stick is released (crisp stops)
     revBoost: 1.55,         // PHASE 4.1: extra accel bite when picking up from rest
                             // or reversing direction (alignment blends it to 1.0)
-    turnRate: 13,           // PHASE 4.1: base facing turn rate — big reversals are
+    turnRate: 16,           // Build 7: 13 -> 16           // PHASE 4.1: base facing turn rate — big reversals are
                             // weighted down so the body swings through, not snaps
 
     sprintDrain: 0.2,       // stamina / second while sprinting (tactical, not punishing)
@@ -277,9 +281,12 @@ LG.Config = {
   // level name too, so phones stay smooth.
   // ------------------------------------------------------------
   quality: {
-    low:    { label: 'LOW',    dprCap: 1,    shadows: false, shadowMap: 1024 },
-    medium: { label: 'MEDIUM', dprCap: 2,    shadows: true,  shadowMap: 1024 },
-    high:   { label: 'HIGH',   dprCap: 2,    shadows: true,  shadowMap: 2048 },
+    // Build 7: MEDIUM (the phone default) renders at 1.5x — sharp on a
+    // phone, half the pixels of 2x; dynamic resolution trims further when
+    // a frame runs long. post = the graphics pipeline tier (js/post.js).
+    low:    { label: 'LOW',    dprCap: 1,    shadows: false, shadowMap: 1024, post: 0 },
+    medium: { label: 'MEDIUM', dprCap: 1.5,  shadows: true,  shadowMap: 1024, post: 1 },
+    high:   { label: 'HIGH',   dprCap: 2,    shadows: true,  shadowMap: 2048, post: 2 },
   },
 
   touch: {

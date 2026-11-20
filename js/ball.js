@@ -39,6 +39,7 @@ LG.Ball.prototype = {
     this.intendedT = 0;
     this._guided = null;
     this._kickSeq = (this._kickSeq || 0) + 1;   // invalidate old keeper save rolls
+    this.curveT = 0;
     if (this.mesh) this.mesh.position.set(this.x, this.y, this.z);
   },
 
@@ -51,6 +52,7 @@ LG.Ball.prototype = {
     var m = Math.sqrt(vx * vx + vy * vy + vz * vz);
     if (m > max) { vx *= max / m; vy *= max / m; vz *= max / m; }
     this.vx = vx; this.vy = vy; this.vz = vz;
+    this.curveT = 0;
     this.owner = null;
     this.atRest = false;
     LG.Audio.sfx.kick(m / max);
@@ -72,6 +74,11 @@ LG.Ball.prototype = {
     this.vy += P.gravity * dt;
     this.y += this.vy * dt;
 
+    // Build 7: a finesse strike bends (lateral spin force) while in flight
+    if (this.curveT > 0) {
+      this.vx += (this.curveX || 0) * dt; this.vz += (this.curveZ || 0) * dt;
+      this.curveT -= dt;
+    }
     // horizontal integration
     this.x += this.vx * dt;
     this.z += this.vz * dt;

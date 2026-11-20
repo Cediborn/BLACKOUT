@@ -1509,6 +1509,20 @@ LG.Arena = (function () {
     root.add(fenceV([[-halfL, halfL]], -halfW, null));
     root.add(fenceV([[-halfL, halfL]], halfW, null));
 
+    // Build 7: bake everything that never moves into a few draw calls
+    // (the court surface swaps, trees sway, the crowd is instanced)
+    if (LG.Batch) {
+      try {
+        var ex = [surfaceGroup];
+        for (var ai = 0; ai < anims.length; ai++) ex.push(anims[ai].g);
+        var bc = LG.Batch.mergeByColor(root, ex);
+        var bs = LG.Batch.mergeStatic(root, ex);
+        bs.colour = bc.merged;
+        root.userData.batch = bs;
+        if (window.console) console.log('[ARENA] batched ' + bs.merged + ' static meshes: ' + bs.before + ' -> ' + bs.after + ' draws');
+      } catch (be) { if (window.console) console.warn('[ARENA] batching skipped: ' + be.message); }
+    }
+
     scene.add(root);
 
     // goal/shot reactions are bound once inside LG.Crowd.bind() (called from
