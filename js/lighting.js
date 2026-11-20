@@ -52,7 +52,39 @@ LG.Lighting = (function () {
       skyTint: 0x8697bc,
       fill: 1.1,
     },
+    // Build 5 — golden hour: low warm sun, long shadows, lamps just coming on
+    dusk: {
+      hemiSky: 0xf2a879, hemiGround: 0x2b2231, hemiIntensity: 0.40,
+      ambColor: 0x3b3043, ambIntensity: 0.20,
+      sunColor: 0xff9d5c, sunIntensity: 1.55,
+      fogColor: 0xb98473, fogNear: 60, fogFar: 185,
+      exposure: 1.02,
+      pointIntensity: 1.0, pointDistance: 1.1,
+      emissive: 1.0,
+      skyTint: 0xffc9a8,
+      fill: 0.3,
+      sunPos: [34, 11, 9],
+      sky: 'night',
+    },
+    // Build 5 — BLACKOUT: the power is cut. Floodlights and street lamps die,
+    // windows go dark; a cold moon, a flickering generator lamp, car
+    // headlights and the festoon string keep the court just playable.
+    blackout: {
+      hemiSky: 0x2b3a5c, hemiGround: 0x040509, hemiIntensity: 0.24,
+      ambColor: 0x111829, ambIntensity: 0.14,
+      sunColor: 0x9fb8ff, sunIntensity: 0.42,
+      fogColor: 0x020308, fogNear: 26, fogFar: 88,
+      exposure: 1.0,
+      pointIntensity: 0.06, pointDistance: 0.8,
+      emissive: 0.12,
+      skyTint: 0x3e4862,
+      fill: 0.62,
+      flicker: true,
+      sky: 'night',
+    },
   };
+  var SUN_POS = [16, 30, 12];
+  var flickT = 0, flickDrop = 0;
 
   function makeKeyLights() {
     hemi = new THREE.HemisphereLight(0x9db4da, 0x23272f, 0.72);
@@ -117,7 +149,7 @@ LG.Lighting = (function () {
           m._lgDayMap = maps.day || null;
           m._lgNightMap = maps.night || null;
           // honour whichever mode is already active
-          var wantMap = mode === 'day' ? m._lgDayMap : m._lgNightMap;
+          var wantMap = mode === 'day' ? m._lgDayMap : m._lgNightMap;   // every non-day mode uses the night dome
           if (wantMap && m.map !== wantMap) { m.map = wantMap; m.needsUpdate = true; }
         }
       }
@@ -150,12 +182,17 @@ LG.Lighting = (function () {
   }
 
   function setMode(m) {
-    mode = (m === 'night') ? 'night' : 'day';
+    mode = PRESETS[m] ? m : 'day';
     var P = PRESETS[mode];
+    var skyKey = P.sky || mode;   // dusk + blackout use the night dome
 
     if (hemi) { hemi.color.setHex(P.hemiSky); hemi.groundColor.setHex(P.hemiGround); hemi.intensity = P.hemiIntensity; }
     if (ambient) { ambient.color.setHex(P.ambColor); ambient.intensity = P.ambIntensity; }
-    if (sun) { sun.color.setHex(P.sunColor); sun.intensity = P.sunIntensity; }
+    if (sun) {
+      sun.color.setHex(P.sunColor); sun.intensity = P.sunIntensity;
+      var sp = P.sunPos || SUN_POS;
+      sun.position.set(sp[0], sp[1], sp[2]);
+    }
 
     if (scene && scene.fog) {
       scene.fog.color.setHex(P.fogColor);
@@ -179,7 +216,7 @@ LG.Lighting = (function () {
     for (i = 0; i < skies.length; i++) {
       var s = skies[i];
       if (s.color) s.color.setHex(P.skyTint);
-      var skyMap = mode === 'day' ? s._lgDayMap : s._lgNightMap;
+      var skyMap = skyKey === 'day' ? s._lgDayMap : s._lgNightMap;
       if (skyMap && s.map !== skyMap) { s.map = skyMap; s.needsUpdate = true; }
     }
 
@@ -190,10 +227,26 @@ LG.Lighting = (function () {
     return mode;
   }
 
+  // Per-frame: only BLACKOUT does anything — the generator lamps over the
+  // court stutter and now and then drop out for a beat. Reduced motion
+  // keeps them steady. Never allocates.
+  function update(dt) {
+    var P = PRESETS[mode];
+    if (!P || !P.flicker || !fills.length) return;
+    var steady = LG.Settings && LG.Settings.reducedMotion && LG.Settings.reducedMotion();
+    flickT += dt;
+    if (flickDrop > 0) flickDrop -= dt;
+    else if (!steady && Math.random() < dt * 0.35) flickDrop = 0.06 + Math.random() * 0.18;
+    var k = steady ? 1 : (flickDrop > 0 ? 0.15 : 0.82 + 0.18 * Math.sin(flickT * 23.0) * Math.sin(flickT * 7.3));
+    for (var i = 0; i < fills.length; i++) fills[i].intensity = P.fill * k;
+  }
+
   return {
     build: build,
     collect: collect,
     setMode: setMode,
+    update: update,
+    modes: function () { return Object.keys(PRESETS); },
     mode: function () { return mode; },
     // what the environment actually contained when collect() ran
     stats: function () { return { points: stats.points, emissives: stats.emissives, skies: stats.skies }; },

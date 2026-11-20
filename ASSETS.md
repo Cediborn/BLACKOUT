@@ -7,6 +7,7 @@ abilities: nothing here grants gameplay stats.
 | --- | --- | --- | --- | --- |
 | Soccer player rig | `3d/soap_soccer_player.glb` | `js/realplayer.js`, `js/models.js` | CC-BY-4.0 | luccacatalan (Sketchfab) |
 | Athlete body + 37 clips | `3d/athlete.glb` | `js/athlete.js` | CC0-1.0 | Quaternius — Universal Animation Library 1 + 2 |
+| Fonts: Anton, Barlow, Barlow Condensed (7 × woff2, Latin) | `fonts/*.woff2` | `css/broadcast.css` | SIL OFL 1.1 (`fonts/OFL.txt`) | The Anton Project Authors; The Barlow Project Authors (via @fontsource on npm) |
 | Menu music (5 tracks) | `audio/menu/*.mp3` | `js/menu-music.js` | See note below | Google generative AI |
 
 ## Generated in code (Build 3, no new files)
@@ -56,6 +57,15 @@ abilities: nothing here grants gameplay stats.
   `js/config.js` palettes. Cosmetic outfits, faces, hairstyles and accessories
   are procedural box/cylinder overlays baked onto the bones at load; they change
   appearance only.
+
+## Build 5 (menus, logo, weather)
+
+- **Logo + app icons** (`index.html` SVG symbol `#bo-ball`, `icons/icon-*.svg`):
+  original, drawn in SVG for BLACKOUT. The O is a ball half blacked out.
+- **Rain, splashes, wet sheen** (`js/weather.js`) and the **dusk / blackout**
+  lighting presets (`js/lighting.js`) are generated in code; no new files.
+- **Fonts**: see the table above. Shipped locally and cached by the service
+  worker, so the game still works offline.
 
 ## Custom / original content (no third-party licence)
 

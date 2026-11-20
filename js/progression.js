@@ -185,6 +185,29 @@ LG.Progression = (function () {
     return Math.round(coins / 10) * 10;
   }
 
+  // Build 5: the same sum as rewardFor, line by line, for the results
+  // screen. Kept next to rewardFor so the two can never drift apart.
+  function rewardBreakdown(won, stats) {
+    var home = (stats && stats.home) || {};
+    var away = (stats && stats.away) || {};
+    var hf = num(home.goals), ha = num(away.goals);
+    var lines = [];
+    lines.push({ label: won === 1 ? 'WIN' : won === 0 ? 'DRAW' : 'TURNING UP', n: won === 1 ? 120 : won === 0 ? 60 : 35 });
+    if (hf) lines.push({ label: 'GOALS ' + hf + ' × 12', n: hf * 12 });
+    if (ha) lines.push({ label: 'END TO END ' + ha + ' × 5', n: ha * 5 });
+    if (hf > ha) lines.push({ label: 'MARGIN ' + (hf - ha) + ' × 8', n: (hf - ha) * 8 });
+    if (won === 1 && ha === 0) lines.push({ label: 'CLEAN SHEET', n: 20 });
+    var tk = Math.min(30, num(home.tackles) * 2);
+    if (tk) lines.push({ label: 'TACKLES ' + num(home.tackles) + ' × 2' + (tk === 30 ? ' (MAX)' : ''), n: tk });
+    var sv = Math.min(20, num(home.saves) * 5);
+    if (sv) lines.push({ label: 'SAVES ' + num(home.saves) + ' × 5' + (sv === 20 ? ' (MAX)' : ''), n: sv });
+    var raw = 0;
+    for (var i = 0; i < lines.length; i++) raw += lines[i].n;
+    var total = rewardFor(won, stats);
+    if (total !== raw) lines.push({ label: 'ROUNDED', n: total - raw });
+    return { lines: lines, total: total };
+  }
+
   // The ONE place a completed match mutates the profile. Callers must guard
   // against double-entry (MatchManager._finalized). Returns the result with
   // coins filled in so the results screen reads the finalized payload.
@@ -375,6 +398,7 @@ LG.Progression = (function () {
     history: history,
     historyMax: function () { return HISTORY_MAX; },
     rewardFor: rewardFor,
+    rewardBreakdown: rewardBreakdown,
     finalizeMatch: finalizeMatch,
     reset: reset,
     reload: reload,

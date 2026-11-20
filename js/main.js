@@ -138,6 +138,11 @@
     // gather the environment's own lights/emissive signs/sky now that it exists
     LG.Lighting.collect(scene);
     LG.Lighting.setMode(LG.Settings.timeOfDay());
+    // Build 5: rain (built lazily the first time it is switched on)
+    if (LG.Weather) {
+      LG.Weather.build(scene, function () { return LG.Settings.qualityLevel(IS_MOBILE); });
+      LG.Weather.set(LG.Settings.weather());
+    }
 
     // read-only handles for the offline verification tooling (tools/) — lets a
     // headless probe raycast the live scene without touching gameplay
@@ -720,6 +725,7 @@
     bus.on('pauseRequested', function () {
       if (UIState !== 'match') return;
       UIState = 'paused';
+      if (LG.Hub) LG.Hub.pauseBoard(match);
       showOverlay('pause-overlay', true);
       LG.Audio.crowdStop();
       LG.Input.setEnabled(false);
@@ -898,12 +904,20 @@
       b.addEventListener('click', function () { LG.Audio.sfx.click(); fn(); });
     }
     on('time-day', function () { setTimeOfDay('day'); });
+    on('time-dusk', function () { setTimeOfDay('dusk'); });
     on('time-night', function () { setTimeOfDay('night'); });
+    on('time-blackout', function () { setTimeOfDay('blackout'); });
+    on('weather-dry', function () { setWeather('dry'); });
+    on('weather-rain', function () { setWeather('rain'); });
     on('view-portrait', function () { setView('portrait'); });
     on('view-landscape', function () { setView('landscape'); });
     // Settings screen (Phase 4) — same stores, separate controls
     on('settings-day', function () { setTimeOfDay('day'); refreshSettingsScreen(); });
     on('settings-night', function () { setTimeOfDay('night'); refreshSettingsScreen(); });
+    on('settings-dusk', function () { setTimeOfDay('dusk'); refreshSettingsScreen(); });
+    on('settings-blackout', function () { setTimeOfDay('blackout'); refreshSettingsScreen(); });
+    on('settings-weather-dry', function () { setWeather('dry'); refreshSettingsScreen(); });
+    on('settings-weather-rain', function () { setWeather('rain'); refreshSettingsScreen(); });
     on('settings-portrait', function () { setView('portrait'); refreshSettingsScreen(); });
     on('settings-landscape', function () { setView('landscape'); refreshSettingsScreen(); });
     on('vol-master-0', function () { LG.Settings.setVolMaster(0); refreshSettingsScreen(); });
@@ -963,7 +977,11 @@
     var tod = LG.Settings.timeOfDay();
     var view = LG.Settings.view();
     markSelected('settings-day', tod === 'day');
+    markSelected('settings-dusk', tod === 'dusk');
     markSelected('settings-night', tod === 'night');
+    markSelected('settings-blackout', tod === 'blackout');
+    markSelected('settings-weather-dry', LG.Settings.weather() === 'dry');
+    markSelected('settings-weather-rain', LG.Settings.weather() === 'rain');
     markSelected('settings-portrait', view === 'portrait');
     markSelected('settings-landscape', view === 'landscape');
     var mb = volBucket(LG.Settings.volMaster());
@@ -1090,7 +1108,14 @@
     LG.Settings.setTimeOfDay(m);
     // cheap reconfigure — the environment is already built, only the lighting
     // presets are re-applied (no rebuild, no reload)
-    LG.Lighting.setMode(m);
+    LG.Lighting.setMode(LG.Settings.timeOfDay());
+    refreshSettingsUI();
+  }
+
+  // Build 5: rain on/off — re-wets the current surface, no rebuild
+  function setWeather(w) {
+    LG.Settings.setWeather(w);
+    if (LG.Weather) LG.Weather.set(LG.Settings.weather());
     refreshSettingsUI();
   }
 
@@ -1110,12 +1135,26 @@
     var tod = LG.Settings.timeOfDay();
     var view = LG.Settings.view();
     var pairs = [
-      ['time-day', tod === 'day'], ['time-night', tod === 'night'],
+      ['time-day', tod === 'day'], ['time-dusk', tod === 'dusk'],
+      ['time-night', tod === 'night'], ['time-blackout', tod === 'blackout'],
+      ['weather-dry', LG.Settings.weather() === 'dry'], ['weather-rain', LG.Settings.weather() === 'rain'],
       ['view-portrait', view === 'portrait'], ['view-landscape', view === 'landscape'],
     ];
     for (var i = 0; i < pairs.length; i++) {
       var b = document.getElementById(pairs[i][0]);
       if (b) b.classList.toggle('selected', pairs[i][1]);
+    }
+    // one line under MATCH SETUP saying what the pick does to the street
+    var note = document.getElementById('setup-note');
+    if (note) {
+      var wet = LG.Settings.weather() === 'rain';
+      var NOTE = {
+        day: 'DAY: hard sun and long shadows.',
+        dusk: 'DUSK: low orange sun; lamps and windows are coming on.',
+        night: 'NIGHT: floodlights on, headlights on the ring road.',
+        blackout: 'BLACKOUT: the power is cut. Moonlight, a flickering generator lamp and car headlights light the court.',
+      };
+      note.textContent = (NOTE[tod] || '') + (wet ? ' RAIN: wet, shiny asphalt and splashes.' : '');
     }
   }
 
@@ -1130,6 +1169,7 @@
       LG.Lighting.collect(scene);
       LG.Lighting.setMode(LG.Settings.timeOfDay());
     }
+    if (LG.Weather) LG.Weather.set(LG.Settings.weather());
   }
 
   // Reflect the selected level on the difficulty screen.
@@ -1185,6 +1225,7 @@
     document.getElementById('res-home').textContent = r.score[0];
     document.getElementById('res-away').textContent = r.score[1];
     document.getElementById('res-coins-n').textContent = '+' + U.fmtMoney(r.coins);
+    if (LG.Hub) LG.Hub.resultCoins(r);
     // match statistics table (missing stats degrades to zeros / 50%)
     var s = r.stats || {};
     var h = s.home || {};
@@ -1365,34 +1406,74 @@
   }
 
   // ---------------- mode / tournament UI (Phase 3D) ----------------
+  // Build 5 mode tiles: icon, kicker, name, blurb. Three planned modes are
+  // shown as SOON tiles that cannot be picked (they are on the roadmap).
+  var MODE_ICON = {
+    quick_match: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7.5l4 3-1.5 4.5h-5L8 10.5z',
+    challenge_match: 'M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 16.6 6.7 19.5l1.1-6L3.4 9.3l6-.8z',
+    tournament: 'M7 4h10v4a5 5 0 01-10 0zM7 6H4a3 3 0 003 4M17 6h3a3 3 0 01-3 4M12 13v4M8 21h8M9 17h6',
+    first_to_5: 'M5 21V4M5 4h11l-2 4 2 4H5',
+    street_twist: 'M20 14A8 8 0 1110 4a6 6 0 0010 10z',
+  };
+  var MODE_SOON = [
+    { name: 'PENALTY SHOOTOUT', blurb: 'Five kicks each. Aim, charge, shoot, then dive the right way.', icon: 'M3 20V6h18v14M3 10h18M8 6v14M16 6v14' },
+    { name: 'THE YARD', blurb: 'Training drills with 3-star scores.', icon: 'M4 20l4-8 4 4 4-10 4 14M3 20h18' },
+    { name: 'RUMBLE', blurb: 'Grab orbs on the court to fire any of the 8 abilities.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z' },
+  ];
+  // tolerant attribute write (the headless boot harness uses a tiny fake DOM)
+  function setAttr(el, k, v) { if (el && el.setAttribute) el.setAttribute(k, v); }
+  function modeIcon(d) {
+    return '<svg class="mode-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="' + d + '"/></svg>';
+  }
+
   function refreshModeUI() {
     var list = document.getElementById('mode-list');
     if (!list) return;
     list.innerHTML = '';
     var modes = (LG.Modes && LG.Modes.list) ? LG.Modes.list() : [];
+    var T = LG.Tournament;
     for (var i = 0; i < modes.length; i++) {
       (function (m) {
         var card = document.createElement('div');
-        card.className = 'mode-card' + (m.id === selectedMode ? ' selected' : '');
+        card.className = 'mode-card mode-' + m.id + (m.id === selectedMode ? ' selected' : '');
         card.dataset.id = m.id;
+        setAttr(card, 'role', 'button');
+        setAttr(card, 'tabindex', '0');
+        setAttr(card, 'aria-pressed', m.id === selectedMode ? 'true' : 'false');
         var tw = m.id === 'street_twist' && LG.Modes.twistInfo ? LG.Modes.twistInfo('daily') : null;
-        var tag = m.id === 'tournament' ? 'KNOCKOUT · 4 TEAMS'
+        var tag = m.id === 'tournament' ? (T && T.active() ? 'IN PROGRESS · ' + T.roundLabel() : 'KNOCKOUT · 4 TEAMS')
           : m.id === 'challenge_match' ? 'USES YOUR 3 ACTIVE CHALLENGES'
           : m.id === 'first_to_5' ? 'NO CLOCK PRESSURE · NO DRAWS'
-          : tw ? 'TODAY: ' + tw.label + ' — ' + tw.blurb.toUpperCase()
+          : tw ? 'TODAY: ' + tw.label
           : 'STANDARD MATCH';
+        var blurb = tw ? tw.blurb + ' ' + m.blurb : m.blurb;
         card.innerHTML =
+          '<div class="mode-top">' + modeIcon(MODE_ICON[m.id] || MODE_ICON.quick_match) + '</div>' +
+          '<div class="mode-tag">' + tag + '</div>' +
           '<div class="mode-name">' + m.name + '</div>' +
-          '<div class="mode-blurb">' + m.blurb + '</div>' +
-          '<div class="mode-tag">' + tag + '</div>';
-        card.addEventListener('click', function () {
+          '<div class="mode-blurb">' + blurb + '</div>';
+        function pick() {
           selectedMode = m.id;
           if (LG.Modes) LG.Modes.select(m.id);
           refreshModeUI();
           LG.Audio.sfx.click();
-        });
+        }
+        card.addEventListener('click', pick);
+        card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
         list.appendChild(card);
       })(modes[i]);
+    }
+    for (var j = 0; j < MODE_SOON.length; j++) {
+      var sd = MODE_SOON[j];
+      var sc = document.createElement('div');
+      sc.className = 'mode-card mode-soon';
+      setAttr(sc, 'aria-disabled', 'true');
+      sc.innerHTML =
+        '<div class="mode-top">' + modeIcon(sd.icon) + '<span class="mode-badge">SOON</span></div>' +
+        '<div class="mode-tag">ON THE ROADMAP</div>' +
+        '<div class="mode-name">' + sd.name + '</div>' +
+        '<div class="mode-blurb">' + sd.blurb + '</div>';
+      list.appendChild(sc);
     }
   }
 
@@ -1688,6 +1769,7 @@
     if (id === 'menu-overlay' && on) {
       if (LG.Modes && LG.Modes.clearTwist) LG.Modes.clearTwist();       // twists never outlive their match
       refreshQuickPlayLabel();
+      if (LG.Hub) LG.Hub.refresh();
     }
     var el = document.getElementById(id);
     if (!el) return;
@@ -1708,6 +1790,14 @@
   }
 
   // ---------------- character select UI ----------------
+  // Build 5 star cards: OVR (the average of the six stats), six stat bars,
+  // the ability with its one-line description, and the unlock price.
+  function ovrOf(stats) {
+    var names = ['speed', 'shoot', 'pass', 'dribble', 'defense', 'stamina'], t = 0;
+    for (var i = 0; i < names.length; i++) t += stats[names[i]] || 0;
+    return Math.round(t / names.length * 10);
+  }
+
   function buildSelectGrid() {
     var grid = document.getElementById('char-grid');
     grid.innerHTML = '';
@@ -1715,19 +1805,24 @@
       (function (def, idx) {
         var card = document.createElement('div');
         card.className = 'char-card' + (def.id === selectedId ? ' selected' : '');
+        setAttr(card, 'role', 'button');
+        setAttr(card, 'tabindex', '0');
         var pal = def.palette;
         var color = '#' + pal.shirt.toString(16).padStart(6, '0');
+        var ab = LG.Abilities && LG.Abilities[def.ability];
+        if (card.style && card.style.setProperty) card.style.setProperty('--kit', color);
         card.innerHTML =
-          '<div class="avatar" style="background:linear-gradient(180deg,rgba(255,255,255,0.16),rgba(0,0,0,0.25));border-color:' + color + '">' + def.emoji + '</div>' +
-          '<div class="cname">' + def.name + '</div>' +
-          '<div class="crole">' + def.role + '</div>' +
-          '<div class="cstats">' +
-          statRows(def.stats) +
-          '</div>';
+          '<div class="cc-top">' +
+            '<div class="char-ovr"><b>' + ovrOf(def.stats) + '</b><span>OVR</span></div>' +
+            '<div class="cc-id"><div class="crole">' + def.role + '</div><div class="cname">' + def.name + '</div></div>' +
+          '</div>' +
+          '<div class="cstats">' + statRows(def.stats) + '</div>' +
+          (ab ? '<div class="cc-ab"><b>' + ab.label + '</b><span>' + ab.desc + '</span></div>' : '');
         card.dataset.id = def.id;
         card.addEventListener('click', function () {
           onCardClick(def, card);
         });
+        card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(def, card); } });
         grid.appendChild(card);
         refreshCardLock(card, def);
       })(LG.Roster[i], i);
@@ -1739,7 +1834,8 @@
     var html = '';
     for (var i = 0; i < names.length; i++) {
       var v = stats[names[i]];
-      html += '<div class="stat-row">' + names[i] + ' <b>' + v + '</b></div>';
+      html += '<div class="stat-row"><span class="sn">' + names[i] + '</span><b>' + v + '</b>' +
+        '<i class="stat-bar"><i style="width:' + Math.max(0, Math.min(10, v)) * 10 + '%"></i></i></div>';
     }
     return html;
   }
@@ -1777,7 +1873,8 @@
         price.className = 'price';
         card.appendChild(price);
       }
-      price.textContent = 'UNLOCK · ' + LG.Progression.costOf(def.id);
+      var cost = LG.Progression.costOf(def.id), have = LG.Progression.coins();
+      price.textContent = have >= cost ? 'TAP TO UNLOCK · ' + cost + ' COINS' : cost + ' COINS · ' + (cost - have) + ' TO GO';
     } else {
       card.classList.remove('locked');
       if (price) price.remove();
@@ -1966,6 +2063,8 @@
   var lastNow = nowSec();
   function nowSec() { return performance.now() / 1000; }
 
+  var MENU_ORBIT = { mode: 1, challengePick: 1, tournament: 1, diff: 1, select: 1, style: 1, court: 1, setup: 1,
+    settings: 1, about: 1, profile: 1, challenges: 1, how: 1 };
   function loop() {
     requestAnimationFrame(loop);
     var now = nowSec();
@@ -2013,8 +2112,9 @@
       LG.Particles.update(dt);
       arenaObj.update(dt);
       if (LG.Living) LG.Living.update(dt);
-    } else if (UIState === 'menu') {
-      // idle cinematic drift
+    } else if (UIState === 'menu' || MENU_ORBIT[UIState]) {
+      // idle cinematic drift — Build 5: the live street shows behind every
+      // pre-match menu, so the drift keeps going on all of them
       var a = bgT * 0.06;
       camera.position.set(Math.sin(a) * 30, 21, Math.cos(a) * 30 + 6);
       camera.lookAt(0, 0, 0);
@@ -2033,6 +2133,13 @@
       if (UIState === 'result' && LG.Input.pressed('rematch')) LG.eventBus.emit('rematchRequested');
       camera.position.set(0, 19, 24);
       camera.lookAt(0, 0, 0);
+    }
+
+    // Build 5: blackout flicker + rain keep moving behind the menus too,
+    // and freeze with the match on pause
+    if (UIState !== 'paused') {
+      if (LG.Lighting.update) LG.Lighting.update(dt);
+      if (LG.Weather) LG.Weather.update(dt);
     }
 
     // review hook (tools/look.js): a parked camera wins over the loop's own

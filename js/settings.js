@@ -9,7 +9,8 @@ var LG = window.LG = window.LG || {};
 LG.Settings = (function () {
   var KEY = 'blockout.settings.v1';
   var data = {
-    timeOfDay: 'day',     // 'day' | 'night'  (day is the baseline)
+    timeOfDay: 'day',     // 'day' | 'dusk' | 'night' | 'blackout'  (day is the baseline)
+    weather: 'dry',       // 'dry' | 'rain'  (Build 5)
     view: 'landscape',    // 'portrait' | 'landscape' (existing mobile default was landscape)
     volMaster: 0.55,      // 0..1 — historical master gain default
     volSfx: 1,            // 0..1 — procedural blips / kicks / whistle
@@ -19,7 +20,8 @@ LG.Settings = (function () {
     quality: 'auto',      // 'auto' | 'low' | 'medium' | 'high' (Phase 10 graphics quality)
   };
 
-  var TIME = ['day', 'night'];
+  var TIME = ['day', 'dusk', 'night', 'blackout'];
+  var WEATHER = ['dry', 'rain'];
   var VIEW = ['portrait', 'landscape'];
   var QUALITY = ['auto', 'low', 'medium', 'high'];
 
@@ -36,6 +38,7 @@ LG.Settings = (function () {
         var p = JSON.parse(raw);
         if (TIME.indexOf(p.timeOfDay) >= 0) data.timeOfDay = p.timeOfDay;
         if (VIEW.indexOf(p.view) >= 0) data.view = p.view;
+        if (WEATHER.indexOf(p.weather) >= 0) data.weather = p.weather;
         if (p.volMaster !== undefined) data.volMaster = num01(p.volMaster, data.volMaster);
         if (p.volSfx !== undefined) data.volSfx = num01(p.volSfx, data.volSfx);
         if (p.volCrowd !== undefined) data.volCrowd = num01(p.volCrowd, data.volCrowd);
@@ -65,9 +68,18 @@ LG.Settings = (function () {
       return data.timeOfDay;
     },
     cycleTimeOfDay: function () {
-      return this.setTimeOfDay(data.timeOfDay === 'day' ? 'night' : 'day');
+      return this.setTimeOfDay(TIME[(TIME.indexOf(data.timeOfDay) + 1) % TIME.length]);
     },
 
+    // any lit-by-lamps time (headlights, windows, festoons glow)
+    isDark: function () { return data.timeOfDay !== 'day'; },
+    times: function () { return TIME.slice(); },
+    weather: function () { return data.weather; },
+    setWeather: function (w) {
+      if (WEATHER.indexOf(w) < 0) return data.weather;
+      data.weather = w; save();
+      return data.weather;
+    },
     view: function () { return data.view; },
     setView: function (m) {
       if (VIEW.indexOf(m) < 0) return data.view;
@@ -130,6 +142,7 @@ LG.Settings = (function () {
     snapshot: function () {
       return {
         timeOfDay: data.timeOfDay,
+        weather: data.weather,
         view: data.view,
         volMaster: data.volMaster,
         volSfx: data.volSfx,

@@ -26,6 +26,23 @@ node tools/shot.js --state menu --out menu.png
 node tools/shot.js --glbtest --glbpose tackle:0.29 --out tackle.png
 ```
 
+To film every menu and check the Build 5 screens (also part of `npm test`):
+
+```sh
+node tools/look.js tools/looks/menus.js --out looks-out/build5
+```
+
+## What's new in 1.5.0
+
+- **New look, everywhere:** a floodlight-broadcast skin over every menu (`css/broadcast.css`). Slab panels, Anton and Barlow type shipped with the game (works offline), spray pink and volt cyan accents, and the live 3D street drifting behind every pre-match screen.
+- **New logo and app icon:** the O in BLACKOUT is a ball caught mid power cut.
+- **Home hub:** a big KICK OFF, PLAY NOW with your last setup, Street Cup status (continue a run in one tap), today's Street Twist, your 3 active challenges, your coins and a bottom bar.
+- **Loading screen:** 12 floodlights switch on as the game really loads, with a random ability tip.
+- **Star cards:** an OVR rating (the average of the six stats), six stat bars, the ability with its one-line description, and the price or how many coins to go.
+- **Modes:** icon tiles; Penalty Shootout, The Yard and Rumble are shown as SOON (not playable yet).
+- **New conditions:** DUSK (low orange sun) and BLACKOUT (the power is cut: moonlight, a flickering generator lamp and car headlights), plus RAIN with streaks, splashes and wet, shiny asphalt. Pick them in MATCH SETUP or SETTINGS.
+- **In the match:** a TV-style score box, round action buttons and a cyan ability ring. PAUSE shows the live score and match stats; FULL TIME lists how every coin was earned.
+
 ## What's new in 1.4.0
 
 - **Kit room:** PLAYER STYLE is now two live 3D players, one from your team and one from the Rogue Squad. Tap a player to change that team's kit colour (the two teams can never match). Tap the orb under a player to change the team's kit style (Hoodie, Hood Down, Track Top, Jersey, Pinnie, Long Sleeve, Windbreaker, Baggy Kit). The whole team wears the style; keepers keep the keeper kit. Both choices are remembered and used by PLAY NOW.

@@ -839,6 +839,25 @@ section('5. match settings are wired into the real game state');
   check(elements['time-night'].classList.contains('selected') && !elements['time-day'].classList.contains('selected'),
     'NIGHT reflects in the option UI', 'daySel=' + elements['time-day'].classList.contains('selected') + ' nightSel=' + elements['time-night'].classList.contains('selected'));
 
+  // Build 5: DUSK + BLACKOUT through the real buttons; blackout flickers
+  elements['time-dusk'].fire('click');
+  check(LG.Settings.timeOfDay() === 'dusk' && LG.Lighting.mode() === 'dusk', 'DUSK button sets the dusk lighting', LG.Lighting.mode());
+  elements['time-blackout'].fire('click');
+  check(LG.Settings.timeOfDay() === 'blackout' && LG.Lighting.mode() === 'blackout' &&
+    elements['time-blackout'].classList.contains('selected') && !elements['time-night'].classList.contains('selected'),
+    'BLACKOUT button sets the blackout lighting and shows in the UI', LG.Lighting.mode());
+  var flickErr = null;
+  try { for (var fk = 0; fk < 120; fk++) LG.Lighting.update(1 / 60); } catch (e) { flickErr = e; }
+  check(!flickErr, 'the blackout flicker runs clean', flickErr && flickErr.message);
+  check(LG.Settings.snapshot().timeOfDay === 'blackout', 'BLACKOUT persists in the settings');
+  // RAIN through the real button, then back to DRY
+  var rainErr = null;
+  try { elements['weather-rain'].fire('click'); } catch (e) { rainErr = e; }
+  check(!rainErr && LG.Settings.weather() === 'rain' && elements['weather-rain'].classList.contains('selected'),
+    'RAIN button turns the rain on', rainErr ? rainErr.message : LG.Settings.weather());
+  elements['weather-dry'].fire('click');
+  check(LG.Settings.weather() === 'dry' && !elements['weather-rain'].classList.contains('selected'), 'DRY button turns it off');
+
   // NIGHT -> DAY restores it
   elements['time-day'].fire('click');
   check(LG.Settings.timeOfDay() === 'day' && LG.Lighting.mode() === 'day',
@@ -1470,7 +1489,13 @@ section('9. game modes + tournament (Phase 3D: once-only fixtures, mode-aware re
   elements['btn-play'].fire('click');
   check(vis('mode-overlay') && window.LGMain.getState() === 'mode', 'mode screen opens', window.LGMain.getState());
   var modeCards = (elements['mode-list'] && elements['mode-list'].children) || [];
-  check(modeCards.length === 5, 'mode list renders 5 cards', modeCards.length);
+  // Build 5: 5 playable modes + 3 SOON tiles that cannot be picked
+  var playable = [], soon = 0;
+  for (var mci = 0; mci < modeCards.length; mci++) {
+    if (/mode-soon/.test(modeCards[mci].className || '')) soon++; else playable.push(modeCards[mci]);
+  }
+  check(playable.length === 5 && soon === 3, 'mode list renders 5 playable modes + 3 SOON tiles', playable.length + '+' + soon);
+  modeCards = playable;
   // pick CHALLENGE MATCH card -> CONTINUE -> challenge pick
   modeCards[1].fire('click');
   check(M.is('challenge_match'), 'clicking card 1 selects challenge_match', M.id());

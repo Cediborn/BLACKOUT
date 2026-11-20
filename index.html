@@ -6,16 +6,37 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="theme-color" content="#141413" />
+<meta name="theme-color" content="#0e0e0d" />
 <meta name="description" content="BLACKOUT - 3V3 street football with goalkeepers" />
 <title>BLACKOUT — Street Football</title>
 <meta name="application-name" content="BLACKOUT" />
+<link rel="preload" href="fonts/anton.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/barlow-condensed-700.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/broadcast.css" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
 </head>
 <body>
+  <!-- BLACKOUT logo parts (Build 5): the O is a ball caught in a power cut -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <clipPath id="bo-ball-clip"><circle cx="50" cy="50" r="45"/></clipPath>
+      <symbol id="bo-ball" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="45" fill="#ece9e0"/>
+        <g clip-path="url(#bo-ball-clip)">
+          <path d="M50 31 L68 44 L61 65 L39 65 L32 44 Z" fill="#0e0e0d"/>
+          <path d="M50 4 L59 11 L56 21 L44 21 L41 11 Z" fill="#0e0e0d"/>
+          <path d="M93 38 L89 49 L78 48 L75 37 L84 30 Z" fill="#0e0e0d"/>
+          <path d="M7 38 L16 30 L25 37 L22 48 L11 49 Z" fill="#0e0e0d"/>
+          <polygon points="0,66 100,40 100,100 0,100" fill="#0e0e0d"/>
+          <polygon points="0,62 100,36 100,42 0,68" fill="#f04f9b"/>
+        </g>
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#ece9e0" stroke-width="5"/>
+      </symbol>
+    </defs>
+  </svg>
   <canvas id="game-canvas"></canvas>
   <div id="vignette"></div>
   <div id="flash"></div>
@@ -39,7 +60,7 @@
 
   <div id="mode-chip" class="hidden"></div>
 
-  <div id="scoreboard" class="hidden">
+  <div id="scoreboard" class="hidden sb-bug">
     <div class="team home">
       <span class="label" id="home-label">HOME</span>
       <span class="score" id="home-score">0</span>
@@ -83,68 +104,59 @@
   </div>
 
   <!-- ================= OVERLAYS ================= -->
-  <!-- Main menu -->
-  <div id="menu-overlay" class="overlay">
-    <div class="panel menu-stage">
-      <!-- LEFT: the primary action, the biggest thing on the screen -->
-      <button id="btn-play" class="menu-kick menu-rise" type="button">
-        <span class="mk-head">
-          <span class="mk-label">KICK OFF</span>
-          <span class="mk-sub">3V3 &middot; STREET RULES</span>
-        </span>
-        <span class="mk-art" aria-hidden="true">
-          <svg class="mk-ball" viewBox="0 0 100 100" role="img" aria-hidden="true">
-            <circle cx="50" cy="50" r="45" fill="#f7f3e8" stroke="#17160f" stroke-width="5"/>
-            <g fill="#17160f">
-              <path d="M50 30 L69 43.8 L61.8 66.2 L38.2 66.2 L31 43.8 Z"/>
-              <path d="M50 8 L58.6 14.2 L55.3 24.3 L44.7 24.3 L41.4 14.2 Z"/>
-              <path d="M89.9 37 L86.7 47.1 L76.1 47.1 L72.8 37 L81.4 30.8 Z"/>
-              <path d="M74.7 84 L64.1 84 L60.8 73.9 L69.4 67.7 L78 73.9 Z"/>
-              <path d="M25.3 84 L35.9 84 L39.2 73.9 L30.6 67.7 L22 73.9 Z"/>
-              <path d="M10 37 L18.6 30.8 L27.2 37 L23.9 47.1 L13.3 47.1 Z"/>
-            </g>
-          </svg>
-          <svg class="mk-players" viewBox="0 0 150 70" aria-hidden="true">
-            <g fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="30" cy="15" r="8.5" fill="currentColor" stroke="none"/>
-              <path d="M30 26 L26 44"/>
-              <path d="M28 31 L15 25"/><path d="M28 34 L42 41"/>
-              <path d="M26 44 L15 60"/><path d="M26 44 L37 58"/>
-              <circle cx="112" cy="14" r="8.5" fill="currentColor" stroke="none"/>
-              <path d="M112 25 L108 43"/>
-              <path d="M110 30 L97 24"/><path d="M110 33 L124 40"/>
-              <path d="M108 43 L97 59"/><path d="M108 43 L119 57"/>
-            </g>
-            <circle cx="75" cy="55" r="11" fill="#f7f3e8" stroke="#17160f" stroke-width="3.5"/>
-          </svg>
-        </span>
-        <span class="mk-foot"><span class="mk-dot"></span>PRESS TO PLAY</span>
-      </button>
+  <!-- Main menu: the home hub (Build 5). The live 3D street shows through. -->
+  <div id="menu-overlay" class="overlay hub">
+    <div class="panel hub-stage">
+      <header class="hub-top">
+        <div class="bo-logo" role="img" aria-label="BLACKOUT"><span class="bo-w">BLACK</span><svg class="bo-o" viewBox="0 0 100 100" aria-hidden="true"><use href="#bo-ball"/></svg><span class="bo-w bo-pink">UT</span></div>
+        <span class="hub-strap">STREET FOOTBALL</span>
+        <span class="hub-fill"></span>
+        <span class="hub-coins" aria-label="Coins"><span class="coin"></span><span id="hub-coins">0</span></span>
+      </header>
 
-      <!-- CENTER: the career card -->
-      <button id="btn-profile" class="menu-profile menu-rise" type="button">
-        <span class="mp-label">PROFILE</span>
-        <span class="mp-sub">CAREER &middot; STATS &middot; KITS</span>
-      </button>
+      <div class="hub-grid">
+        <button id="btn-play" class="hub-kick menu-rise" type="button">
+          <svg class="hk-art" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45"/><path class="hk-pent" d="M50 31 L68 44 L61 65 L39 65 L32 44 Z"/><path d="M50 31V8M68 44l22-8M61 65l14 19M39 65L25 84M32 44l-22-8"/></svg>
+          <span class="hk-k">3V3 &middot; STREET RULES</span>
+          <span class="hk-name">KICK<br>OFF</span>
+          <span class="hk-sub">Pick a mode, your star, kits and court.</span>
+          <span class="hk-foot">PRESS TO PLAY <svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M1 7h18M13 1l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6"/></svg></span>
+        </button>
 
-      <!-- RIGHT: brand + the secondary navigation -->
-      <div class="menu-side">
-        <div class="menu-brand menu-rise">
-          <div class="title-xl"><span class="t1">BLACK</span><span class="t2">OUT</span></div>
-          <div class="street-tag">STREET FOOTBALL</div>
-        </div>
-        <div class="menu-nav menu-rise">
-          <button id="btn-quick-play" class="big-btn menu-card menu-quick" type="button" aria-describedby="qp-sub">
-            <span class="qp-label">&#9654; PLAY NOW</span>
-            <span class="qp-sub" id="qp-sub">BLAZE · REGULAR KIT</span>
+        <div class="hub-mid menu-rise">
+          <button id="btn-quick-play" class="hub-tile hub-quick" type="button" aria-describedby="qp-sub">
+            <span class="ht-k"><span class="qp-label">PLAY NOW</span><span class="ht-k2">LAST SETUP</span></span>
+            <span class="ht-name">QUICK MATCH</span>
+            <span class="qp-sub ht-sub" id="qp-sub">BLAZE · REGULAR KIT</span>
           </button>
-          <button id="btn-challenges" class="big-btn gold menu-card" type="button">CHALLENGES</button>
-          <button id="btn-settings" class="big-btn secondary menu-card" type="button">SETTINGS</button>
-          <button id="btn-how" class="big-btn gold menu-card" type="button">HOW TO PLAY</button>
-          <button id="btn-about" class="big-btn gold menu-card" type="button">ABOUT</button>
+          <button id="hub-cup" class="hub-tile hub-cup" type="button">
+            <span class="ht-k"><span id="hub-cup-k">STREET CUP</span><span class="ht-k2" id="hub-cup-k2">4 TEAMS</span></span>
+            <span class="ht-name">STREET CUP</span>
+            <span class="hub-cup-bar" aria-hidden="true"><i id="hub-cup-r1"></i><i id="hub-cup-r2"></i><span class="ht-sub" id="hub-cup-sub">SEMI-FINAL + FINAL</span></span>
+          </button>
         </div>
-        <div class="menu-version" id="menu-version">v1.4.0</div>
+
+        <div class="hub-side menu-rise">
+          <button id="hub-twist" class="hub-tile hub-twist" type="button">
+            <span class="ht-k">TODAY&#39;S STREET TWIST</span>
+            <span class="ht-name" id="hub-twist-name">STREET TWIST</span>
+            <span class="ht-sub" id="hub-twist-blurb"></span>
+          </button>
+          <div id="hub-challenges" class="hub-challenges" aria-label="Active challenges">
+            <div class="hc-head"><span>CHALLENGES</span><span id="hub-ch-count">3 ACTIVE</span></div>
+            <div id="hub-ch-list"></div>
+          </div>
+        </div>
       </div>
+
+      <nav id="hub-nav" class="hub-nav" aria-label="Main">
+        <button id="btn-profile" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>PROFILE</button>
+        <button id="btn-challenges" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 16.6 6.7 19.5l1.1-6L3.4 9.3l6-.8z"/></svg>CHALLENGES</button>
+        <button id="btn-how" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 0c0 2-2.5 2-2.5 4M12 17h.01"/></svg>HOW TO PLAY</button>
+        <button id="btn-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>SETTINGS</button>
+        <button id="btn-about" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>ABOUT</button>
+        <span class="menu-version" id="menu-version">v1.5.0</span>
+      </nav>
     </div>
   </div>
 
@@ -331,19 +343,29 @@
   <div id="setup-overlay" class="overlay hidden">
     <div class="panel">
       <div class="title-xl" style="font-size:clamp(26px,6.4vmin,50px)"><span class="t1">MATCH</span> <span class="t2">SETUP</span></div>
+      <div class="setup-note" id="setup-note">BLACKOUT: the floodlights fail. Headlights, festoons and windows light the court.</div>
       <div class="option-groups setup-groups">
         <div class="option-group">
           <div class="option-label">TIME OF DAY</div>
           <div class="option-row">
-            <button class="option-btn selected" id="time-day">☀ DAY</button>
-            <button class="option-btn" id="time-night">🌙 NIGHT</button>
+            <button class="option-btn selected" id="time-day">DAY</button>
+            <button class="option-btn" id="time-dusk">DUSK</button>
+            <button class="option-btn" id="time-night">NIGHT</button>
+            <button class="option-btn" id="time-blackout">BLACKOUT</button>
+          </div>
+        </div>
+        <div class="option-group">
+          <div class="option-label">WEATHER</div>
+          <div class="option-row">
+            <button class="option-btn selected" id="weather-dry">DRY</button>
+            <button class="option-btn" id="weather-rain">RAIN</button>
           </div>
         </div>
         <div class="option-group">
           <div class="option-label">GAME VIEW</div>
           <div class="option-row">
-            <button class="option-btn" id="view-portrait">▯ PORTRAIT</button>
-            <button class="option-btn selected" id="view-landscape">▭ LANDSCAPE</button>
+            <button class="option-btn" id="view-portrait">PORTRAIT</button>
+            <button class="option-btn selected" id="view-landscape">LANDSCAPE</button>
           </div>
         </div>
       </div>
@@ -441,8 +463,16 @@
           <div class="help-section-title">DISPLAY</div>
           <div class="help-row"><span class="help-key">TIME</span>
             <span class="option-row" role="group" aria-label="Time of day">
-              <button class="option-btn" id="settings-day" type="button">☀ DAY</button>
-              <button class="option-btn" id="settings-night" type="button">🌙 NIGHT</button>
+              <button class="option-btn" id="settings-day" type="button">DAY</button>
+              <button class="option-btn" id="settings-dusk" type="button">DUSK</button>
+              <button class="option-btn" id="settings-night" type="button">NIGHT</button>
+              <button class="option-btn" id="settings-blackout" type="button">BLACKOUT</button>
+            </span>
+          </div>
+          <div class="help-row"><span class="help-key">RAIN</span>
+            <span class="option-row" role="group" aria-label="Weather">
+              <button class="option-btn" id="settings-weather-dry" type="button">DRY</button>
+              <button class="option-btn" id="settings-weather-rain" type="button">RAIN</button>
             </span>
           </div>
           <div class="help-row"><span class="help-key">VIEW</span>
@@ -490,12 +520,12 @@
   <!-- About / legal / credits / bug report -->
   <div id="about-overlay" class="overlay hidden">
     <div class="panel">
-      <div class="title-xl" style="font-size:clamp(28px,6.5vmin,50px)"><span class="t1">ABOUT</span> <span class="t2">BLACKOUT</span></div>
+      <div class="bo-logo bo-logo-about" role="img" aria-label="BLACKOUT"><span class="bo-w">BLACK</span><svg class="bo-o" viewBox="0 0 100 100" aria-hidden="true"><use href="#bo-ball"/></svg><span class="bo-w bo-pink">UT</span></div>
       <div class="help-sections about-grid">
         <div class="help-section" data-about="about">
           <div class="help-section-title">ABOUT</div>
           <div class="help-row"><span class="help-key">GAME</span><span class="help-desc">BLACKOUT is a 3V3 street football game with goalkeepers — quick matches, focused challenges and a four-team Street Cup.</span></div>
-          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.4.0</b></span></div>
+          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.5.0</b></span></div>
           <div class="help-row"><span class="help-key">RUN</span><span class="help-desc">Plays fully offline after the first load. No account, no server, no purchases.</span></div>
         </div>
         <div class="help-section" data-about="credits">
@@ -506,6 +536,7 @@
           <div class="help-row"><span class="help-key">MODEL</span><span class="help-desc">"Soap Soccer Player" by luccacatalan (Sketchfab), licensed CC BY 4.0 — base mesh for every player</span></div>
           <div class="help-row"><span class="help-key">SFX</span><span class="help-desc">Procedural Web Audio — every sound effect and the crowd are generated in code</span></div>
           <div class="help-row"><span class="help-key">MUSIC</span><span class="help-desc">Menu tracks created with Google generative AI (marked by embedded Content Credentials)</span></div>
+          <div class="help-row"><span class="help-key">FONTS</span><span class="help-desc">Anton (The Anton Project Authors) and Barlow / Barlow Condensed (The Barlow Project Authors), SIL Open Font License 1.1 — see fonts/OFL.txt</span></div>
           <div class="help-row"><span class="help-key">ART</span><span class="help-desc">Court art, murals and UI treatment created for this project</span></div>
           <div class="help-row"><span class="help-key">CODE</span><span class="help-desc">Gameplay, AI, progression and UI written for BLACKOUT</span></div>
         </div>
@@ -540,25 +571,82 @@
     </div>
   </div>
 
-  <!-- Loading / fatal error -->
+  <!-- Loading / fatal error: the floodlights come on as the game loads -->
   <div id="loading-overlay" class="overlay">
     <div class="panel loading-panel">
-      <div class="title-xl"><span class="t1">BLACK</span><span class="t2">OUT</span></div>
-      <div class="street-tag" id="loading-tag">LOADING THE PITCH…</div>
+      <div class="bo-logo bo-logo-xl" role="img" aria-label="BLACKOUT"><span class="bo-w">BLACK</span><svg class="bo-o" viewBox="0 0 100 100" aria-hidden="true"><use href="#bo-ball"/></svg><span class="bo-w bo-pink">UT</span></div>
+      <div class="ld-strap">STREET FOOTBALL &middot; 3V3</div>
+      <div class="ld-lights" id="ld-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="ld-row"><span class="street-tag" id="loading-tag">LOADING THE PITCH…</span><span class="ld-pct" id="ld-pct">LIGHTS ON · 0%</span></div>
+      <div class="ld-tip" id="ld-tip"><span class="ld-tip-k">ABILITY TIP</span><span id="ld-tip-text"><b>ICE GRIP</b> freezes the rival squad in place for a moment.</span></div>
       <div id="loading-error" class="loading-error hidden" role="alert"></div>
       <button id="btn-loading-retry" class="big-btn gold hidden" type="button">RELOAD</button>
     </div>
   </div>
+  <script>
+    // Build 5 loading bar: 12 floodlights switch on as real boot milestones
+    // pass (page parsed, 3D engine, game code, player model, first frame).
+    (function () {
+      var TIPS = [
+        ['BURST', 'explodes your winger forward with a massive speed boost.'],
+        ['POWER SHOT', 'fires a rocket that rattles the net. Hold SHOOT to charge.'],
+        ['DEADLY FEET', 'glues the ball to your boots. Plow past defenders.'],
+        ['BLOCKBUSTER', 'is a shockwave tackle that clears the area.'],
+        ['LASSER LINE', 'makes your next pass laser-guided and unstoppable.'],
+        ['ICE GRIP', 'freezes the rival squad in place for a moment.'],
+        ['BOOM HAND', 'blasts everyone away so you can grab any loose ball.'],
+        ['CONCRETE WALL', 'plants your player like a wall. Shots bounce off.']
+      ];
+      try {
+        var t = TIPS[Math.floor(Math.random() * TIPS.length)];
+        var el = document.getElementById('ld-tip-text');
+        if (el) { el.innerHTML = ''; var b = document.createElement('b'); b.textContent = t[0]; el.appendChild(b); el.appendChild(document.createTextNode(' ' + t[1])); }
+      } catch (e) {}
+      var t0 = Date.now(), shown = 0;
+      function target() {
+        var n = 2;
+        if (window.THREE) n = 4;
+        if (window.LGMain) n = 6;
+        var A = window.LG && LG.Athlete && LG.Athlete.status ? LG.Athlete.status().phase : '';
+        if (A === 'loading') n = 7 + Math.min(3, Math.floor((Date.now() - t0) / 1500));
+        if (A === 'ready' || A === 'error') n = 11;
+        return n;
+      }
+      function tick() {
+        var ov = document.getElementById('loading-overlay');
+        if (!ov) return;
+        var done = ov.classList.contains('hidden');
+        var want = done ? 12 : target();
+        if (want > shown) {
+          shown = want;
+          var bulbs = document.querySelectorAll('#ld-lights i');
+          for (var i = 0; i < bulbs.length; i++) bulbs[i].className = i < shown ? 'on' : (i === shown ? 'next' : '');
+          var pct = document.getElementById('ld-pct');
+          if (pct) pct.textContent = 'LIGHTS ON · ' + Math.round(shown / 12 * 100) + '%';
+        }
+        if (!done) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
 
-  <!-- Pause -->
+  <!-- Pause: actions left, the live match board right -->
   <div id="pause-overlay" class="overlay hidden">
     <div class="panel pause-panel">
-      <h2>PAUSED</h2>
-      <div class="row-btns">
-        <button id="btn-resume" class="big-btn">RESUME</button>
-        <button id="btn-restart" class="big-btn gold">RESTART</button>
-        <button id="btn-pause-how" class="big-btn secondary">HOW TO PLAY</button>
-        <button id="btn-quit-menu" class="big-btn secondary">QUIT TO MENU</button>
+      <div class="pause-col">
+        <div class="pause-k" id="pause-k">QUICK MATCH</div>
+        <h2>PAUSED</h2>
+        <div class="row-btns">
+          <button id="btn-resume" class="big-btn">RESUME</button>
+          <button id="btn-restart" class="big-btn gold">RESTART</button>
+          <button id="btn-pause-how" class="big-btn secondary">HOW TO PLAY</button>
+          <button id="btn-quit-menu" class="big-btn secondary">QUIT TO MENU</button>
+        </div>
+      </div>
+      <div class="pause-board" aria-label="Match so far">
+        <div class="pb-score"><span class="pb-h" id="pb-home">YOU</span><span class="pb-n" id="pb-score">0 – 0</span><span class="pb-a" id="pb-away">ROGUE</span></div>
+        <div id="pause-stats" class="pause-stats"></div>
+        <div class="pb-note" id="pb-note"></div>
       </div>
     </div>
   </div>
@@ -584,6 +672,7 @@
         </tbody>
       </table>
       <div class="result-coins" id="res-coins"><span class="coin"></span><span id="res-coins-n">+0</span></div>
+      <div id="res-coin-lines" class="res-coin-lines" aria-label="How the coins were earned"></div>
       <div class="result-challenges" id="res-challenges">
         <div class="help-section-title">CHALLENGES</div>
         <ul id="res-ch-list" class="profile-history" aria-label="Completed challenges"></ul>
@@ -610,7 +699,7 @@
     if (window.THREE && THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 
     // Single early version stamp so a failed boot still shows a real number.
-    window.BLOCKOUT_VERSION = '1.4.0';
+    window.BLOCKOUT_VERSION = '1.5.0';
     window.addEventListener('error', function (e) {
       try {
         var box = document.getElementById('loading-error');
@@ -663,11 +752,13 @@
   <script src="js/keeper.js"></script>
   <script src="js/camera.js"></script>
   <script src="js/lighting.js"></script>
+  <script src="js/weather.js"></script>
   <script src="js/match.js"></script>
   <script src="js/celebration.js"></script>
   <script src="js/goal-cinematic.js"></script>
   <script src="js/reactions.js"></script>
   <script src="js/hud.js"></script>
+  <script src="js/hub.js"></script>
   <script src="js/main.js"></script>
   <script src="js/streetlife.js"></script>
   <script src="js/living.js"></script>

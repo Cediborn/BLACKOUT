@@ -612,7 +612,7 @@ LG.Living = (function () {
     var L = PATH.len;
     _cars.sort(function (a, b) { return a.s - b.s; });
     var night = false;
-    try { night = !!(LG.Settings && LG.Settings.timeOfDay && LG.Settings.timeOfDay() === 'night'); } catch (e) { night = false; }
+    try { night = !!(LG.Settings && LG.Settings.timeOfDay && LG.Settings.timeOfDay() !== 'day'); } catch (e) { night = false; }
     if (LG.Vehicles && LG.Vehicles.setNight) LG.Vehicles.setNight(night);
     for (i = 0; i < _cars.length; i++) {
       c = _cars[i];

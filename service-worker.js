@@ -9,11 +9,19 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v21';   // Build 4 — kit room (PLAYER STYLE with live 3D players)
+var CACHE_NAME = 'blackout-v22';   // Build 5 — floodlight broadcast menus, logo, fonts, dusk/blackout, rain
 var ASSETS = [
   './',
   './index.html',
   './css/style.css',
+  './css/broadcast.css',
+  './fonts/anton.woff2',
+  './fonts/barlow-condensed-600.woff2',
+  './fonts/barlow-condensed-700.woff2',
+  './fonts/barlow-condensed-800.woff2',
+  './fonts/barlow-400.woff2',
+  './fonts/barlow-500.woff2',
+  './fonts/barlow-600.woff2',
   './manifest.json',
   './art/wall.jpg',
   './art/mural.jpg',
@@ -66,12 +74,14 @@ var ASSETS = [
   './js/keeper.js',
   './js/camera.js',
   './js/lighting.js',
+  './js/weather.js',
   './js/match.js',
   './js/celebration.js',
   './js/goal-cinematic.js',
   './js/reactions.js',
   './js/crowd.js',
   './js/hud.js',
+  './js/hub.js',
   './js/main.js',
   './js/streetlife.js',
   './js/living.js',
