@@ -143,7 +143,7 @@
           <button id="btn-how" class="big-btn gold menu-card" type="button">HOW TO PLAY</button>
           <button id="btn-about" class="big-btn gold menu-card" type="button">ABOUT</button>
         </div>
-        <div class="menu-version" id="menu-version">v1.2.0</div>
+        <div class="menu-version" id="menu-version">v1.3.0</div>
       </div>
     </div>
   </div>
@@ -496,13 +496,14 @@
         <div class="help-section" data-about="about">
           <div class="help-section-title">ABOUT</div>
           <div class="help-row"><span class="help-key">GAME</span><span class="help-desc">BLACKOUT is a 3V3 street football game with goalkeepers — quick matches, focused challenges and a four-team Street Cup.</span></div>
-          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.2.0</b></span></div>
+          <div class="help-row"><span class="help-key">VER</span><span class="help-desc">Version <b id="about-version">1.3.0</b></span></div>
           <div class="help-row"><span class="help-key">RUN</span><span class="help-desc">Plays fully offline after the first load. No account, no server, no purchases.</span></div>
         </div>
         <div class="help-section" data-about="credits">
           <div class="help-section-title">CREDITS</div>
           <div class="help-row"><span class="help-key">3D</span><span class="help-desc">Three.js (MIT License) by the three.js authors</span></div>
           <div class="help-row"><span class="help-key">PLAYERS</span><span class="help-desc">Player body and animations from Quaternius' Universal Animation Library 1 + 2 (CC0)</span></div>
+          <div class="help-row"><span class="help-key">KITS</span><span class="help-desc">Clothing, fans' bodies, street people, pigeons, steam and the food cart are generated in code from the CC0 body above</span></div>
           <div class="help-row"><span class="help-key">MODEL</span><span class="help-desc">"Soap Soccer Player" by luccacatalan (Sketchfab), licensed CC BY 4.0 — base mesh for every player</span></div>
           <div class="help-row"><span class="help-key">SFX</span><span class="help-desc">Procedural Web Audio — every sound effect and the crowd are generated in code</span></div>
           <div class="help-row"><span class="help-key">MUSIC</span><span class="help-desc">Menu tracks created with Google generative AI (marked by embedded Content Credentials)</span></div>
@@ -610,7 +611,7 @@
     if (window.THREE && THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 
     // Single early version stamp so a failed boot still shows a real number.
-    window.BLOCKOUT_VERSION = '1.2.0';
+    window.BLOCKOUT_VERSION = '1.3.0';
     window.addEventListener('error', function (e) {
       try {
         var box = document.getElementById('loading-error');
@@ -647,9 +648,11 @@
   <script src="js/courts.js"></script>
   <script src="js/models.js"></script>
   <script src="js/cosmetics.js"></script>
+  <script src="js/fanbody.js"></script>
   <script src="js/crowd.js"></script>
   <script src="js/rig.js"></script>
 <script src="js/realplayer.js"></script>
+  <script src="js/garments.js"></script>
   <script src="js/athlete.js"></script>
   <script src="js/ball.js"></script>
   <script src="js/player.js"></script>
@@ -666,6 +669,7 @@
   <script src="js/reactions.js"></script>
   <script src="js/hud.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/streetlife.js"></script>
   <script src="js/living.js"></script>
 </body>
 </html>

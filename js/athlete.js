@@ -34,6 +34,7 @@ LG.Athlete = (function () {
   var enabled = true;
   var src = null;              // { scene, clips{}, meta }
   var silent = true;
+  var readyQ = [];             // Build 3: listeners waiting for the body (fans, bystanders)
 
   function log() { if (!silent && window.console) console.log.apply(console, arguments); }
   function warn() { if (window.console && console.warn) console.warn.apply(console, arguments); }
@@ -76,6 +77,8 @@ LG.Athlete = (function () {
     var meta = measure(scene, meshes, clips);
     src = { scene: scene, clips: clips, meshes: meshes, meta: meta };
     phase = 'ready';
+    var q = readyQ; readyQ = [];
+    q.forEach(function (cb) { try { cb(); } catch (e) { warn('[ATH] onReady listener failed -> ' + ((e && e.message) || e)); } });
   }
 
   function bone(scene, name) { return scene.getObjectByName(name) || null; }
@@ -147,11 +150,16 @@ LG.Athlete = (function () {
       for (var i = 0; i < m.n; i++) if (m.dom[i] === 'Head' || m.dom[i] === 'neck_01') headPts.push(m.P[i * 3], m.P[i * 3 + 1], m.P[i * 3 + 2]);
     });
     if (headBox.isEmpty()) headBox.set(new THREE.Vector3(-0.09, J.Head.y - 0.02, -0.11), new THREE.Vector3(0.09, top, 0.12));
+    // Build 3: bone inverses of the REST pose (T-pose). The mesh's own bind
+    // pose differs (arms down), so anything built in rest space (garments,
+    // fan bodies) binds with these.
+    scene.updateMatrixWorld(true);
+    var restInv = meshes[0].skeleton.bones.map(function (b) { return b.matrixWorld.clone().invert(); });
     var kick = probeStrike(scene, clips.kick);
     return {
       J: J, minY: minY, top: top, height: top - minY, chin: chin, eyeY: eyeY, eyeZ: eyeZ,
       noseZ: noseZ, backZ: backZ, backY: backY, perMesh: perMesh, kickStrike: kick, headBox: headBox,
-      headPts: headPts,
+      headPts: headPts, restInv: restInv,
       skullC: new THREE.Vector3(0, eyeY - 0.01, (headBox.max.z + headBox.min.z) / 2 - 0.01),
     };
   }
@@ -503,9 +511,20 @@ LG.Athlete = (function () {
       var clone = cloneScene(src.scene);
       var look = lookFor(def);
       var pal = dress(clone, def, isKeeper, look);
-      face(clone, pal, look);
-      hairVolume(clone, pal, look);
-      shirtNumber(clone, pal, numberFor(def, opts.idx, isKeeper));
+      var num = numberFor(def, opts.idx, isKeeper);
+      // Build 3: real garments over the body (baggy kit, hoodie, pinnie…)
+      var worn = null;
+      if (LG.Garments && opts.garments !== false) {
+        try {
+          var design = opts.design || (isKeeper ? 'keeper' : (def && def.__cos && def.__cos.outfit) || 'jersey');
+          var lean = !!opts.lite;
+          try { lean = lean || LG.Settings.qualityLevel(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) !== 'high'; } catch (qe) { /* high */ }
+          worn = LG.Garments.dress(clone, src.meta, pal, design, num, { lean: lean });
+        } catch (ge) { warn('[ATH] garments skipped -> ' + ((ge && ge.message) || ge)); worn = null; }
+      }
+      if (!opts.lite) face(clone, pal, look);
+      if (!(worn && worn.hood)) hairVolume(clone, pal, look);
+      if (!worn) shirtNumber(clone, pal, num);
 
       var group = new THREE.Group(), body = new THREE.Group(), anchor = new THREE.Group();
       group.add(body); body.add(anchor); anchor.add(clone);
@@ -521,7 +540,7 @@ LG.Athlete = (function () {
       var m = {
         group: group, body: null, anchor: anchor, scene: clone,
         limbs: null, height: M.height, skinned: true, glb: true, athlete: true, clipDriven: true,
-        palette: pal,
+        palette: pal, garment: worn ? worn.design : null,
       };
       m.anim = controller(m, k);
       log('[ATH] built ' + (def && def.id) + ' in ' + (nowMs() - t0).toFixed(1) + 'ms');
@@ -780,6 +799,10 @@ LG.Athlete = (function () {
   return {
     preload: preload,
     ready: function () { return phase === 'ready' && enabled; },
+    // run cb once the body is loaded (at once if it already is). Never
+    // fires on a failed load: callers keep their fallback figures.
+    onReady: function (cb) { if (phase === 'ready') { try { cb(); } catch (e) { warn('[ATH] onReady listener failed -> ' + e); } } else readyQ.push(cb); },
+    clip: function (name) { return src && src.clips[name] || null; },
     status: function () { return { phase: phase, error: errMsg, enabled: enabled, src: SRC, clips: src ? Object.keys(src.clips).length : 0 }; },
     build: build,
     setEnabled: function (on) { enabled = !!on; },

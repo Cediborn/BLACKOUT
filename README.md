@@ -26,6 +26,14 @@ node tools/shot.js --state menu --out menu.png
 node tools/shot.js --glbtest --glbpose tackle:0.29 --out tackle.png
 ```
 
+## What's new in 1.3.0
+
+- **Real kits:** every outfit is now an actual garment on the body, not paint on a slim mannequin. BAGGY KIT is an oversized tee hanging past the shorts with elbow-length sleeves and knee-length baggy shorts; HOODIE has the hood up, a kangaroo pocket and drawstrings; HOOD DOWN has the hood folded on the back; TRACK TOP has a zip, stand collar and three stripes; JERSEY has a V-neck, chevron, crest, side panels and a sleeve band; LONG SLEEVE is a fitted compression top; WINDBREAKER is two-tone with a zip, reflective strip and stand collar; PINNIE is a see-through mesh bib with numbers over a tee; keepers wear a padded keeper kit. Numbers are printed on the fabric. The cloth moves with every animation.
+- **Real fans:** every spectator is cut from the same realistic body as the players (with hair or hats, shoes, sleeves or bare forearms), and a third of each end wears the team scarf. Still about 9 draw calls for the whole crowd.
+- **Real street people:** walkers and fence watchers are real animated people in street clothes (tees, hoodies, puffer jackets, tank tops, oversized tees, jeans). Walkers stroll at walking pace, some looking at their phones; watchers fold their arms, look around, cheer goals and react to near misses.
+- **Street life:** pigeons that take off when people walk close or the crowd roars, steam from manholes, festoon lights over both stands (they glow at night), a street-food cart with a vendor and grill smoke, and litter blowing across the ground in gusts.
+- Tests: `npm run test:build3` checks all of this on the real game in headless Chrome.
+
 ## What's new in 1.2.0
 
 - **Realistic players:** a real-proportion human body with real animation clips (CC0, Quaternius Universal Animation Library), replacing the boxy figures. Each player is dressed in their kit on the body itself (shirt, collar and cuffs, shorts, socks, boots, skin, hair, keeper gloves, shirt number). Movement: idle, walk, jog, sprint, back-pedal, strafes, leaning into turns.

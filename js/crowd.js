@@ -278,7 +278,66 @@ LG.Crowd = (function () {
       initMs = now() - t0;
     }
     bind();
+    upgraded = false;
+    if (N && LG.Athlete && LG.Athlete.onReady) LG.Athlete.onReady(upgrade);
     return root;
+  }
+
+  // ---------------- Build 3: real bodies ----------------
+  // Once the athlete model is loaded, every spectator's capsule parts are
+  // swapped for parts cut from the real body (LG.FanBody), plus hair,
+  // shoes and team scarves. Same draws-per-part architecture: 9 draws.
+  var HAIR = [0x1d1a17, 0x2a211b, 0x3a2a1a, 0x5a3d22, 0x7a5a2b, 0x8a8580, 0x141416, 0xb08850];
+  var HATS = [0xc0392b, 0x2c3e50, 0xf1c40f, 0x16a085, 0x222226];
+  var SHOES = [0xf0f0ea, 0x1c1c20, 0xe8e2d6, 0x3a3a40, 0xc0392b, 0x2f5f8f];
+  var upgraded = false;
+  function upgrade() {
+    if (upgraded || !parts || !specs.length || !LG.FanBody) return false;
+    var lvl = 'high';
+    try { lvl = LG.Settings.qualityLevel(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)); } catch (e) { /* default */ }
+    if (lvl === 'low') return false;
+    var fb = LG.FanBody.make(lvl === 'medium' ? 0.095 : 0.075);
+    if (!fb) return false;
+    var G = fb.geos, pv = fb.pivots;
+    ['legs', 'hip', 'torso', 'head', 'arm', 'hand'].forEach(function (k) {
+      if (!G[k]) return;
+      var old = parts[k].geometry;
+      parts[k].geometry = G[k];
+      if (old && old.dispose) old.dispose();
+    });
+    var N = specs.length;
+    var mat = function () { return new THREE.MeshLambertMaterial({ color: 0xffffff }); };
+    parts.hair = makePart(G.hair, mat(), N, false);
+    parts.feet = makePart(G.feet, mat(), N, false);
+    parts.scarf = makePart(G.scarf, mat(), N, false);
+    var c = new THREE.Color(), _s = 0xFA9C0D;
+    function r() { _s = (_s * 1664525 + 1013904223) >>> 0; return _s / 4294967296; }
+    for (var i = 0; i < N; i++) {
+      var sp = specs[i];
+      sp.aLegs.setPosition(pv.hip); sp.aHip.setPosition(pv.hip);
+      sp.aTorso.setPosition(pv.waist); sp.aHead.setPosition(pv.neck);
+      sp.aArmL.setPosition(pv.shL); sp.aArmR.setPosition(pv.shR);
+      if (sp.sit) sp.baseY -= 0.07;
+      var hat = r() < 0.16;
+      c.setHex(hat ? HATS[(r() * HATS.length) | 0] : HAIR[(r() * HAIR.length) | 0]);
+      parts.hair.setColorAt(i, c);
+      c.setHex(SHOES[(r() * SHOES.length) | 0]); parts.feet.setColorAt(i, c);
+      // allegiance: a third of each end's fans wear the team scarf
+      sp.scarf = sp.sec !== 'side' && r() < 0.42;
+      c.setHex(sp.sec === 'home' ? (r() < 0.5 ? 0x35e0ff : 0x2a7fd4) : (r() < 0.5 ? 0xff4d5e : 0xc92a3a));
+      parts.scarf.setColorAt(i, c);
+      // forearm + hand = skin (short sleeves) or sleeve (long sleeves)
+      c.setHex(r() < 0.35 ? sp.shirt : sp.skin);
+      parts.hand.setColorAt(i * 2, c); parts.hand.setColorAt(i * 2 + 1, c);
+    }
+    ['hair', 'feet', 'scarf', 'hand'].forEach(function (k) {
+      if (parts[k].instanceColor) parts[k].instanceColor.needsUpdate = true;
+      if (k !== 'hand') root.add(parts[k]);
+    });
+    upgraded = true;
+    update(0);
+    if (window.console && console.log) console.log('[CROWD] real bodies: tris≈' + Math.round(fb.tris * N) + ' draws=9');
+    return true;
   }
 
   function estimateTris(geos, n) {
@@ -352,7 +411,8 @@ LG.Crowd = (function () {
   var _P = new THREE.Vector3(), _S = new THREE.Vector3(), _Q = new THREE.Quaternion();
   var _E = new THREE.Euler(0, 0, 0, 'YXZ');
   var _E2 = new THREE.Euler(0, 0, 0, 'XYZ');
-  var PART_ORDER = ['legs', 'hip', 'torso', 'head', 'arm', 'hand'];
+  var _ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+  var PART_ORDER = ['legs', 'hip', 'torso', 'head', 'arm', 'hand', 'hair', 'feet', 'scarf'];
 
   function update(dt) {
     if (!specs.length || !parts) return;
@@ -455,7 +515,7 @@ LG.Crowd = (function () {
       var lx = -0.08, lz = 0, rx = -0.08, rz = 0, tilt = 0, look = 0;
       var tt = t + s.actOff;
       switch (act) {
-        case 'clap': lx = rx = -1.15; lz = -0.42 + 0.2 * Math.sin(tt * 13); rz = -lz; break;
+        case 'clap': lx = rx = -0.78; lz = -0.5 + 0.16 * Math.sin(tt * 13); rz = -lz; break;
         case 'point': rx = -1.55; rz = -0.12; break;
         case 'hips': lx = rx = 0.22; lz = 0.62; rz = -0.62; break;
         case 'wave': rx = -2.75; rz = -0.15 + 0.32 * Math.sin(tt * 7.5); break;
@@ -473,7 +533,7 @@ LG.Crowd = (function () {
         lz = lz * (1 - gk2) + -0.5 * gk2; rz = rz * (1 - gk2) + 0.5 * gk2;
         tilt = -0.1 * gk2;
       } else if (clapT > 0 && cheerT <= 0) {           // applause
-        lx = rx = -1.2; lz = -0.42 + 0.2 * Math.sin(t * 15 + (s.seed & 7)); rz = -lz;
+        lx = rx = -0.82; lz = -0.5 + 0.16 * Math.sin(t * 15 + (s.seed & 7)); rz = -lz;
       }
       s.aLx += (lx - s.aLx) * k; s.aLz += (lz - s.aLz) * k;
       s.aRx += (rx - s.aRx) * k; s.aRz += (rz - s.aRz) * k;
@@ -494,6 +554,7 @@ LG.Crowd = (function () {
 
       _T.multiplyMatrices(_B, s.aLegs);
       parts.legs.setMatrixAt(i, _T);
+      if (parts.feet) parts.feet.setMatrixAt(i, _T);
       _T.multiplyMatrices(_B, s.aHip);
       parts.hip.setMatrixAt(i, _T);
 
@@ -501,11 +562,18 @@ LG.Crowd = (function () {
       _T.multiplyMatrices(_B, s.aTorso);
       _T.multiply(_R);
       parts.torso.setMatrixAt(i, _T);
+      if (parts.scarf) {
+        if (s.scarf) {
+          // scarf up on a goal: held high is a lift + stretch of the same piece
+          parts.scarf.setMatrixAt(i, _T);
+        } else parts.scarf.setMatrixAt(i, _ZERO);
+      }
 
       _R.makeRotationY(head * s.headK);
       _T.multiplyMatrices(_B, s.aHead);
       _T.multiply(_R);
       parts.head.setMatrixAt(i, _T);
+      if (parts.hair) parts.hair.setMatrixAt(i, _T);
 
       _E2.set(aLx * s.armK, 0, aLz);
       _R.makeRotationFromEuler(_E2);
@@ -535,7 +603,7 @@ LG.Crowd = (function () {
     hipFeet: HIP_FEET,
     get stats() {
       return {
-        bodies: specs.length, initMs: initMs, groups: groups.length,
+        bodies: specs.length, initMs: initMs, groups: groups.length, real: upgraded,
         cheer: cheerT, swell: swellT, arm0: groups.length ? groups[0].arm : 0,
         reactMin: _reactMin, reactMax: _reactMax, primes: _primes, cel: _cel,
       };

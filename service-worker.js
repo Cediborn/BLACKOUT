@@ -9,7 +9,7 @@
 // every release — that is what makes installed clients pick the new files up.
 // ============================================================
 
-var CACHE_NAME = 'blackout-v19';   // Phase 11 — athletes, crowd, traffic, city, new modes
+var CACHE_NAME = 'blackout-v20';   // Build 3 — real garments, real fans, street people, street life
 var ASSETS = [
   './',
   './index.html',
@@ -51,6 +51,8 @@ var ASSETS = [
   './js/courts.js',
   './js/models.js',
   './js/cosmetics.js',
+  './js/fanbody.js',
+  './js/garments.js',
   './js/rig.js',
   './js/realplayer.js',
   './js/athlete.js',
@@ -70,6 +72,7 @@ var ASSETS = [
   './js/crowd.js',
   './js/hud.js',
   './js/main.js',
+  './js/streetlife.js',
   './js/living.js',
   './lib/three.min.js',
   './lib/GLTFLoader.js',

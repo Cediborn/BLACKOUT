@@ -9,6 +9,15 @@ abilities: nothing here grants gameplay stats.
 | Athlete body + 37 clips | `3d/athlete.glb` | `js/athlete.js` | CC0-1.0 | Quaternius — Universal Animation Library 1 + 2 |
 | Menu music (5 tracks) | `audio/menu/*.mp3` | `js/menu-music.js` | See note below | Google generative AI |
 
+## Generated in code (Build 3, no new files)
+
+- **Garments** (`js/garments.js`): clothing shells cut from the CC0 athlete body and
+  kit textures painted on a canvas at runtime.
+- **Fan bodies** (`js/fanbody.js`): rigid, simplified parts of the CC0 athlete body.
+- **Street folk** (`js/living.js`) and **street life** (`js/streetlife.js`: pigeons, steam,
+  festoon lights, food cart, litter): built from primitives and canvas textures.
+- No new third-party assets; credited in ABOUT → CREDITS → KITS.
+
 ## Athlete body (Phase 11)
 
 - **File:** `3d/athlete.glb` (1.6 MB): the UAL mannequin (realistic proportions,

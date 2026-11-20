@@ -337,6 +337,130 @@ LG.Living = (function () {
     }
   }
 
+  // ============================================================
+  // Build 3: STREET FOLK — real people on the sidewalks.
+  // Once the athlete body is loaded, walkers and watchers become real
+  // skinned bodies (the same CC0 mannequin as the players) wearing street
+  // clothes from LG.Garments (tees, hoodies, jackets, oversized tees,
+  // jeans), driven by the authored walk / idle / emote clips. The old
+  // instanced figures stay as the fallback (load failure, LOW quality).
+  // HIGH: all 24 people. MEDIUM: 12 (the rest of the old figures hide).
+  // ============================================================
+  var folk = [];
+  var FOLK_SHIRTS = [0x2c3e50, 0xecf0f1, 0xc0392b, 0x16a085, 0xf39c12, 0x8e44ad, 0x1a1a1e, 0x7f8c8d,
+    0xd35400, 0x27ae60, 0x2980b9, 0xbdc3c7, 0x6d4c41, 0xe84393];
+  var FOLK_PANTS = [0x2b3a55, 0x1f2a40, 0x22252b, 0x3d3d42, 0x5a4a3a, 0x34495e, 0x6b6b70];
+  var FOLK_SKIN = [0xf2c9a0, 0xe0a878, 0xc98d5e, 0xa9713f, 0x7a5a42, 0x4f3826];
+  var FOLK_HAIR = [0x1d1a17, 0x2a211b, 0x5a3d22, 0x8a6a3a, 0x9a9590, 0x141416, 0xc0a060];
+  var FOLK_EMOTES = ['fold_arms', 'idle_look', 'idle_look', 'fold_arms', 'no'];
+  var hiddenFig = {};
+  var _Z = null;
+  function hideFigure(i) {
+    if (!fig) return;
+    if (!_Z) _Z = new THREE.Matrix4().makeScale(0, 0, 0);
+    var p = fig.parts;
+    p.leg.setMatrixAt(i * 2, _Z); p.leg.setMatrixAt(i * 2 + 1, _Z);
+    p.torso.setMatrixAt(i, _Z); p.head.setMatrixAt(i, _Z); p.hair.setMatrixAt(i, _Z);
+    p.arm.setMatrixAt(i * 2, _Z); p.arm.setMatrixAt(i * 2 + 1, _Z);
+    p.hand.setMatrixAt(i * 2, _Z); p.hand.setMatrixAt(i * 2 + 1, _Z);
+    hiddenFig[i] = true;
+  }
+  function makeFolk(seed, kind) {
+    var h = (seed * 2654435761) >>> 0;
+    function pick(a, k) { return a[((h >>> (k * 3)) + k * 7) % a.length]; }
+    var designs = LG.Garments ? LG.Garments.street : ['tee'];
+    var design = designs[(h >>> 5) % designs.length];
+    var shirt = pick(FOLK_SHIRTS, 1);
+    var def = {
+      id: 'folk' + seed,
+      palette: { shirt: shirt, trim: pick(FOLK_SHIRTS, 4) === shirt ? 0xffffff : pick(FOLK_SHIRTS, 4),
+        pants: pick(FOLK_PANTS, 2), skin: pick(FOLK_SKIN, 3), hair: pick(FOLK_HAIR, 5) },
+      hairStyle: [7, 3, 4, 5, 6, 0, 2, -1][(h >>> 9) % 8],
+      body: { tall: 0.9 + ((h >>> 13) % 12) / 100, wide: 0.95 + ((h >>> 17) % 14) / 100 },
+    };
+    var m = LG.Athlete.build(def, { design: design, lite: true, idx: seed });
+    if (!m) return null;
+    // some walkers look at their phone (a small slab in the right hand)
+    if (kind === 'ped' && (h & 3) === 0) {
+      var hand = m.scene.getObjectByName('hand_r');
+      if (hand) {
+        var ph = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.15, 0.012),
+          new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.3, emissive: 0x223355, emissiveIntensity: 0.6 }));
+        ph.position.set(-0.06, 0.03, 0.06);
+        hand.add(ph);
+      }
+    }
+    m.group.traverse(function (o) { if (o.isMesh) { o.castShadow = kind === 'watcher'; } });
+    return { m: m, design: design, phone: kind === 'ped' && (h & 3) === 0 };
+  }
+  function upgradeFolk() {
+    if (folk.length || !fig || !LG.Athlete || !LG.Athlete.build) return;
+    var lvl = 'high';
+    try { lvl = LG.Settings.qualityLevel(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)); } catch (e) { /* default */ }
+    if (lvl === 'low') return;
+    var budget = lvl === 'medium' ? 12 : 24, made = 0;
+    for (var i = 0; i < movers.length && made < budget; i++) {
+      var mv = movers[i];
+      if (mv.kind !== 'ped' && mv.kind !== 'watcher') continue;
+      if (lvl === 'medium' && mv.kind === 'ped' && (mv.idx % 2)) continue;
+      var f = makeFolk(mv.idx + 11, mv.kind);
+      if (!f) continue;
+      scene.add(f.m.group);
+      mv.folk = f;
+      mv.walkV = 1.15 + ((mv.idx * 37) % 10) * 0.05;          // real walking pace, m/s
+      mv.emoteT = 1 + (mv.idx % 5) * 1.7;
+      mv.p = { vx: 0, vz: 0, facing: 0, stamina: 1, model: f.m };
+      folk.push(mv);
+      hideFigure(mv.idx);
+      made++;
+    }
+    if (lvl !== 'medium') fig.root.visible = false;
+    flushFigures(fig);
+  }
+  // goal / save / miss reactions for the watchers
+  function folkReact(kind) {
+    for (var i = 0; i < folk.length; i++) {
+      var mv = folk[i];
+      if (mv.kind !== 'watcher' || !mv.folk) continue;
+      var a = mv.folk.m.anim, r = (mv.idx * 7 + i) % 4;
+      if (kind === 'goal') a.emote(r === 0 ? 'dance' : r === 1 ? 'yes' : 'celebrate', { dur: 2.6 + r * 0.3, restart: true });
+      else if (kind === 'miss') a.emote(r < 2 ? 'surprise' : 'no', { dur: 1.6, restart: true });
+      mv.emoteT = 5 + r;
+    }
+  }
+  var _fp = {};
+  function updateFolk(dt) {
+    for (var i = 0; i < folk.length; i++) {
+      var mv = folk[i], m = mv.folk.m, p = mv.p;
+      if (mv.kind === 'ped') {
+        var L = 8 * WALK;
+        mv.t = (mv.t + mv.dir * mv.walkV * dt / L) % 1;
+        if (mv.t < 0) mv.t += 1;
+        var q = ringPos(WALK, WALK, mv.t);
+        // round the corners: look a little ahead and steer the facing
+        var q2 = ringPos(WALK, WALK, mv.t + mv.dir * 1.2 / L);
+        var yaw = Math.atan2(q2.x - q.x, q2.z - q.z);
+        var dy = yaw - p.facing; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        p.facing += dy * Math.min(1, dt * 5);
+        p.vx = Math.sin(p.facing) * mv.walkV; p.vz = Math.cos(p.facing) * mv.walkV;
+        m.group.position.set(q.x, 0, q.z);
+        // phone users walk a touch slower with the head down
+        if (mv.folk.phone) { p.vx *= 0.85; p.vz *= 0.85; }
+      } else {
+        p.vx = 0; p.vz = 0; p.facing = mv.yaw;
+        m.group.position.set(mv.x, 0, mv.z);
+        mv.emoteT -= dt;
+        if (mv.emoteT <= 0) {
+          var e = FOLK_EMOTES[(mv.idx + Math.floor(clock / 7)) % FOLK_EMOTES.length];
+          m.anim.emote(e, { dur: e === 'fold_arms' ? 6 : 3.2, restart: true });
+          mv.emoteT = 6 + (mv.idx % 4) * 2;
+        }
+      }
+      m.group.rotation.y = p.facing;
+      m.anim.update(dt, p);
+    }
+  }
+
   function build(ctx) {
     if (!ctx || !ctx.scene) return;
     if (movers.length) return;          // build once
@@ -418,8 +542,13 @@ LG.Living = (function () {
 
     if (!sub && LG.eventBus && LG.eventBus.on) {
       LG.eventBus.on('goal', cheer);
+      LG.eventBus.on('goal', function () { folkReact('goal'); });
+      LG.eventBus.on('postHit', function () { folkReact('miss'); });
       sub = true;
     }
+    if (LG.Athlete && LG.Athlete.onReady) LG.Athlete.onReady(upgradeFolk);
+    // Build 3: pigeons, steam, festoon lights, food cart, blowing litter
+    if (LG.StreetLife) { try { LG.StreetLife.build(scene); } catch (e) { if (window.console) console.warn('[LIVING] streetlife skipped', e); } }
   }
 
   function update(dt) {
@@ -449,8 +578,11 @@ LG.Living = (function () {
       pulse = Math.max(0, pulse - dt);
       pulseBob = Math.sin(pulse * 40) * 0.12;
     }
+    if (folk.length) updateFolk(dt);
+    if (LG.StreetLife) LG.StreetLife.update(dt);
     for (i = 0; i < movers.length; i++) {
       m2 = movers[i];
+      if (m2.folk) continue;
       if (m2.kind === 'ped') {
         m2.phase += dt * (1.7 + m2.speed * 10) * 6.283;
         m2.t = (m2.t + (m2.dir * m2.speed * step * 0.02)) % 1;
@@ -533,9 +665,19 @@ LG.Living = (function () {
     for (var i = 0; i < watcherSpots.length; i++) w.push({ x: watcherSpots[i].x, z: watcherSpots[i].z });
     return {
       walk: WALK, car: { rx: CAR_RX, rz: CAR_RZ }, bike: BIKE_R,
-      peds: PEDS, watchers: w,
+      peds: PEDS, watchers: w, folk: folk.length,
     };
   }
 
-  return { build: build, update: update, cheer: cheer, info: info, traffic: trafficInfo, pathAt: function (s) { return pathAt(s, {}); }, pathLength: function () { if (!PATH) buildPath(); return PATH.len; } };
+  function folkPositions() {
+    var out = [];
+    for (var i = 0; i < movers.length; i++) {
+      var m = movers[i];
+      if (m.folk && m.kind === 'ped') out.push({ x: m.folk.m.group.position.x, z: m.folk.m.group.position.z });
+      else if (m.kind === 'ped' && !m.folk) { var q = ringPos(m.Rx, m.Rz, m.t); out.push({ x: q.x, z: q.z }); }
+    }
+    return out;
+  }
+
+  return { build: build, update: update, folkPositions: folkPositions, cheer: cheer, info: info, traffic: trafficInfo, pathAt: function (s) { return pathAt(s, {}); }, pathLength: function () { if (!PATH) buildPath(); return PATH.len; } };
 })();
